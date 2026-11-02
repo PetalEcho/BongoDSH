@@ -15,7 +15,8 @@ bongodsh-core = { path = "crates/bongodsh-core" }
 eframe = { version = "0.34.3", default-features = false, features = ["default_fonts", "glow"] }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
 all = "warn"

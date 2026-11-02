@@ -6,7 +6,7 @@
 
 BongoDSH 是一个常驻桌面的 Rust 打字挂件，首要平台为 macOS 和 Windows。用户已选择独立桌面程序作为主形态，DSH 接入通过后续轻量插件完成。
 
-角色随输入节奏活动，停下来后恢复静止。最终常驻版本不抢输入焦点，不遮挡主要操作；当前原型需要点击窗口后输入。设置集中在右键菜单或托盘入口。第一版以小尺寸角色、清楚的左右手动作、克制的压下回弹为主。用户明确要求不配键盘图形，当前用原创矢量小鲸鱼验证交互。
+角色随输入节奏活动，停下来后恢复静止。最终常驻版本不抢输入焦点，不遮挡主要操作；当前默认窗口输入，用户可通过右键开启全局键盘。设置集中在右键菜单或托盘入口。第一版以小尺寸角色、清楚的左右手动作、克制的压下回弹为主。用户明确要求不配键盘图形，当前用原创矢量小鲸鱼验证交互。
 
 原型采用雾蓝身体 `#A2D7DD`、蓝色阴影 `#75B6C4`、浅色腹部与双手 `#EBF8F6`、深蓝轮廓 `#2A4352` 和珊瑚腮红 `#EEABA0`。角色居中，只在悬停或焦点状态显示小型操作提示，不绘制背景面板。中文提示使用系统字体；缺失时回退为英文。
 
@@ -32,19 +32,19 @@ macOS 首批目标为 Apple Silicon 与 Intel，Windows 首批目标为 x86_64 M
 | 语言与工程 | Rust stable、Edition 2024、Cargo workspace；当前最低 Rust 1.93 | 已配置 |
 | 核心规则 | 纯 Rust、标准库、确定性的输入状态机和弹簧动画 | 已实现 |
 | 桌面 UI | egui/eframe 0.34.3，Glow 渲染，按需重绘 | 原型已实现 |
-| 原生能力 | 透明置顶、无边框、窗口拖动由 eframe/winit 提供 | 已接入；全局输入仍待实现 |
+| 原生能力 | 窗口由 eframe/winit 提供；全局键盘由独立平台模块提供 | 已接入；完整实机验收见全局输入文档 |
 | 设置与资产 | 本地文件、版本化配置、独立素材目录 | 尚未实现 |
 | DSH 接入 | 轻量 Web/Host 插件与本地桌面进程通信 | 后续阶段 |
 
 选择原生 Rust UI 是为了让桌面程序独立启动，并将状态规则放在同一套 Rust 代码中。当前锁定 eframe 0.34.3，其包声明的最低 Rust 版本为 1.92，兼容项目 Rust 1.93。egui 的 [ViewportBuilder](https://docs.rs/egui/0.34.3/egui/viewport/struct.ViewportBuilder.html) 提供透明、无边框和置顶配置；实际平台效果须分别验证。点击穿透、托盘退出与跨屏缩放尚未纳入本轮原型。
 
-本轮唯一新增的直接生产依赖为 eframe，只启用 `glow` 和 `default_fonts`。托盘、配置序列化和音频库后续按需引入，不预装完整 async 运行时或大型引擎。升级 GUI 库时需要重新核对 MSRV 和对应版本 API。
+桌面使用 eframe，只启用 `glow` 和 `default_fonts`。托盘、配置序列化和音频库后续按需引入，不预装完整 async 运行时或大型引擎。升级 GUI 库时需要重新核对 MSRV 和对应版本 API。
 
 ## 代码边界
 
 ```mermaid
 flowchart LR
-    Native[macOS / Windows 全局输入，待实现] --> Input[应用层按键过滤]
+    Native[macOS / Windows 全局输入] --> Input[应用层按键过滤]
     Window[eframe 窗口内按键] --> Input
     DSH[轻量 DSH 插件，待实现] --> Bridge[布局和任务事件桥接，待实现]
     Input --> Core[bongodsh-core 按键状态机]
@@ -66,13 +66,15 @@ flowchart LR
 
 | 能力 | macOS | Windows |
 | --- | --- | --- |
-| 全局输入 | 验证 Input Monitoring 权限与拒绝后的降级；若窗口跟随使用辅助功能 API，单独说明授权用途 | 评估 Raw Input；必要时使用低级键盘钩子，保持独立消息循环与及时返回 |
+| 全局输入 | 已接入只读 CGEventTap 与 Input Monitoring 申请；已验证未授权降级，已授权场景待实测 | 已接入独立线程低级键盘钩子，避免覆盖 winit 的 Raw Input 注册；实机待验收 |
 | 透明窗口 | 验证透明合成、窗口层级、Spaces 和全屏应用行为 | 验证透明背景、置顶、任务栏隐藏和焦点行为 |
 | 点击穿透 | 先提供整窗穿透与托盘恢复操作；角色区域命中另行验证 | 同样先验证穿透后仍能恢复交互，再做按区域命中 |
 | 多屏 | 验证不同缩放、负坐标、拔屏后召回及 Intel / Apple Silicon | 验证 100% / 125% / 150% / 200% 与混合 DPI |
 | 生命周期 | 监听启停、权限撤销、睡眠唤醒、退出清理 | 监听启停、会话锁定、睡眠唤醒、退出清理 |
 
 Windows 输入设计参考 [Microsoft LowLevelKeyboardProc](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelkeyboardproc)。输入回调只投递事件；渲染、音频和文件读取在回调外执行。
+
+全局输入使用现有锁文件中的 `objc2-core-graphics 0.3.2`、`objc2-core-foundation 0.3.2` 和 `windows-sys 0.61.2` 作为按平台编译的直接依赖，只启用事件监听、运行循环及必要 Win32 API 功能。macOS 的睡眠通知与安全输入查询使用隔离 FFI。生命周期、权限操作与当前验证范围见 [全局键盘监听](global-keyboard.md)。
 
 ## DSH 桥接约定草案
 

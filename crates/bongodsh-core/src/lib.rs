@@ -4,6 +4,7 @@
 //! The state retains physical key identifiers only while keys are held.
 
 #![deny(missing_docs)]
+#![forbid(unsafe_code)]
 
 pub mod animation;
 

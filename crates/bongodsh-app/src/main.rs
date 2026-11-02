@@ -4,6 +4,7 @@ use bongodsh_core::{InputEvent, KeyId, TypingState};
 
 mod art;
 mod desktop;
+mod global_input;
 mod input;
 
 fn main() -> ExitCode {
@@ -30,8 +31,8 @@ fn main() -> ExitCode {
 fn print_help() {
     println!(
         "BongoDSH {}\n\n\
-         透明置顶的桌面打字挂件原型。点击角色后，在挂件窗口内按键触发动画。\n\
-         拖动角色可移动窗口，右键打开菜单。当前未接入全局键盘或 DSH。\n\n\
+         透明置顶的桌面打字挂件。右键选择全局键盘，在其他应用打字时触发动画。\n\
+         macOS 需主动开启输入监控权限。默认仅响应本窗口，未接入 DSH。\n\n\
          用法：\n  bongodsh           启动桌面挂件\n  bongodsh --demo    运行命令行模拟事件\n  bongodsh --help    显示帮助",
         env!("CARGO_PKG_VERSION")
     );

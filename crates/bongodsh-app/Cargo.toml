@@ -15,5 +15,12 @@ path = "src/main.rs"
 bongodsh-core.workspace = true
 eframe.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFMachPort", "CFRunLoop", "CFDate"] }
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGEvent", "CGEventTypes", "CGEventSource", "CGRemoteOperation"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61.2", default-features = false, features = ["Win32_Foundation", "Win32_System_LibraryLoader", "Win32_System_RemoteDesktop", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
+
 [lints]
 workspace = true

@@ -4,7 +4,7 @@
 
 - BongoDSH 是使用 Rust 实现的独立桌面打字挂件，目标平台为 macOS 和 Windows。
 - DSH 指参考仓库所使用的 DeepSeek Harness。后续由轻量 DSH 插件传递布局和任务事件，桌面进程可独立运行。
-- 项目基调、分期和平台边界见 `docs/project-baseline.md`。当前已有 egui/eframe 桌面原型，只响应窗口内按键，全局监听和 DSH 接入仍未实现。
+- 项目基调、分期和平台边界见 `docs/project-baseline.md`。当前已有 egui/eframe 桌面原型与 macOS / Windows 全局键盘适配，默认窗口输入，用户主动开启全局模式。权限与验证边界见 `docs/global-keyboard.md`；DSH 接入仍未实现。
 - 角色小巧、低干扰，主要操作通过右键或托盘进入。设置面板优先展示预览和常用设置，不使用超大标题或口号式 Hero。
 - 用户明确要求角色不配键盘图形。保持角色与双手的独立剪影。
 
@@ -14,7 +14,7 @@
 - `bongodsh-core` 维护平台无关状态与规则，不访问窗口、文件系统、网络或系统键盘。
 - `bongodsh-app` 负责组装应用。后续 macOS、Windows API 放在独立平台模块或 crate，按目标平台编译。
 - 桌面使用 eframe 0.34.3，启用 `glow` 和 `default_fonts`；核心仍只依赖标准库。新增依赖前说明用途、平台支持和引入成本，只启用需要的 features。
-- 核心 crate 禁止 `unsafe`。将来原生 FFI 在隔离模块中单独制定 lint，并为每处 `unsafe` 说明安全前提。
+- 核心 crate 以 `forbid(unsafe_code)` 禁止 `unsafe`。工作区默认 `deny(unsafe_code)`，仅应用层 `global_input/macos.rs` 与 `global_input/windows.rs` 放行原生 FFI，并启用 `unsafe_op_in_unsafe_fn` 和 `clippy::undocumented_unsafe_blocks` 检查，为每处 `unsafe` 说明安全前提。
 - 可恢复错误返回 `Result`，不用 `unwrap()`、`expect()` 或 panic 处理用户输入和权限失败。
 - 事件循环按需唤醒；不要在输入回调中执行磁盘、网络或音频解码任务。
 
