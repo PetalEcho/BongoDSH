@@ -4,7 +4,12 @@ use bongodsh_core::{InputEvent, KeyId, TypingState};
 
 mod art;
 mod desktop;
+mod docking;
 mod input;
+// Native FFI is isolated here; the application and core keep their unsafe bans.
+#[allow(unsafe_code)]
+mod platform;
+mod positioning;
 
 fn main() -> ExitCode {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
@@ -31,7 +36,8 @@ fn print_help() {
     println!(
         "BongoDSH {}\n\n\
          透明置顶的桌面打字挂件原型。点击角色后，在挂件窗口内按键触发动画。\n\
-         拖动角色可移动窗口，右键打开菜单。当前未接入全局键盘或 DSH。\n\n\
+         拖近窗口边缘或可识别输入框后松开可吸附，全屏时默认移到右下角。\n\
+         右键打开菜单。macOS 输入框定位需辅助功能权限；未接入全局键盘或 DSH。\n\n\
          用法：\n  bongodsh           启动桌面挂件\n  bongodsh --demo    运行命令行模拟事件\n  bongodsh --help    显示帮助",
         env!("CARGO_PKG_VERSION")
     );

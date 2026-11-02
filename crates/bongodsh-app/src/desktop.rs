@@ -7,7 +7,7 @@ use eframe::egui::{
 
 use bongodsh_core::{InputEvent, KeyId, TypingState, animation::HandAnimation};
 
-use crate::{art, input};
+use crate::{art, docking::Docking, input};
 
 pub(crate) fn run() -> eframe::Result {
     let options = eframe::NativeOptions {
@@ -27,7 +27,7 @@ pub(crate) fn run() -> eframe::Result {
     eframe::run_native(
         "BongoDSH",
         options,
-        Box::new(|creation| Ok(Box::new(Desktop::new(&creation.egui_ctx)))),
+        Box::new(|creation| Ok(Box::new(Desktop::new(creation)))),
     )
 }
 
@@ -45,10 +45,12 @@ struct Desktop {
     focused: bool,
     always_on_top: bool,
     chinese_font: bool,
+    docking: Docking,
 }
 
 impl Desktop {
-    fn new(ctx: &egui::Context) -> Self {
+    fn new(creation: &eframe::CreationContext<'_>) -> Self {
+        let ctx = &creation.egui_ctx;
         ctx.set_visuals(egui::Visuals::light());
         ctx.global_style_mut(|style| {
             style.visuals.window_fill = Color32::from_rgb(243, 250, 251);
@@ -65,6 +67,7 @@ impl Desktop {
             focused: false,
             always_on_top: true,
             chinese_font: install_system_font(ctx),
+            docking: Docking::new(creation),
         }
     }
 
@@ -142,6 +145,14 @@ impl Desktop {
                     WindowLevel::Normal
                 }));
         }
+        ui.menu_button(self.text("吸附与位置", "Snapping and position"), |ui| {
+            ui.set_max_width(255.0);
+            egui::ScrollArea::vertical()
+                .max_height(225.0)
+                .show(ui, |ui| {
+                    self.docking.menu(ui, self.chinese_font);
+                });
+        });
         ui.separator();
         if ui.button(self.text("退出挂件", "Quit BongoDSH")).clicked() {
             ui.ctx().send_viewport_cmd(ViewportCommand::Close);
@@ -176,6 +187,7 @@ impl eframe::App for Desktop {
             ctx.request_repaint_after(Duration::from_millis(16));
         }
         self.last_frame = now;
+        self.docking.update(ctx);
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -187,9 +199,15 @@ impl eframe::App for Desktop {
             Sense::CLICK | Sense::DRAG,
         );
         if response.drag_started_by(egui::PointerButton::Primary) {
+            self.docking.begin_drag();
             ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+            ui.ctx().request_repaint();
         }
-        response.context_menu(|ui| self.menu(ui));
+        response.context_menu(|ui| {
+            egui::ScrollArea::vertical()
+                .max_height(245.0)
+                .show(ui, |ui| self.menu(ui));
+        });
         let response = response.on_hover_cursor(egui::CursorIcon::Grab);
         art::draw(ui.painter(), bounds, self.animation.positions());
 
@@ -229,10 +247,7 @@ impl eframe::App for Desktop {
                     Color32::from_rgb(63, 144, 146),
                 )
             } else {
-                (
-                    self.text("点击后打字 · 拖动移动", "Click to type · drag to move"),
-                    art::INK,
-                )
+                (self.docking.status(self.chinese_font), art::INK)
             };
             ui.painter()
                 .circle_filled(pos2(hint.min.x + 13.0, hint.center().y), 3.0, color);

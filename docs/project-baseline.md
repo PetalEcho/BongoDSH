@@ -32,13 +32,13 @@ macOS 首批目标为 Apple Silicon 与 Intel，Windows 首批目标为 x86_64 M
 | 语言与工程 | Rust stable、Edition 2024、Cargo workspace；当前最低 Rust 1.93 | 已配置 |
 | 核心规则 | 纯 Rust、标准库、确定性的输入状态机和弹簧动画 | 已实现 |
 | 桌面 UI | egui/eframe 0.34.3，Glow 渲染，按需重绘 | 原型已实现 |
-| 原生能力 | 透明置顶、无边框、窗口拖动由 eframe/winit 提供 | 已接入；全局输入仍待实现 |
+| 原生能力 | eframe/winit 提供透明置顶与拖动；平台模块提供窗口、输入框边界和全屏摆放 | 已接入；全局输入仍待实现 |
 | 设置与资产 | 本地文件、版本化配置、独立素材目录 | 尚未实现 |
 | DSH 接入 | 轻量 Web/Host 插件与本地桌面进程通信 | 后续阶段 |
 
 选择原生 Rust UI 是为了让桌面程序独立启动，并将状态规则放在同一套 Rust 代码中。当前锁定 eframe 0.34.3，其包声明的最低 Rust 版本为 1.92，兼容项目 Rust 1.93。egui 的 [ViewportBuilder](https://docs.rs/egui/0.34.3/egui/viewport/struct.ViewportBuilder.html) 提供透明、无边框和置顶配置；实际平台效果须分别验证。点击穿透、托盘退出与跨屏缩放尚未纳入本轮原型。
 
-本轮唯一新增的直接生产依赖为 eframe，只启用 `glow` 和 `default_fonts`。托盘、配置序列化和音频库后续按需引入，不预装完整 async 运行时或大型引擎。升级 GUI 库时需要重新核对 MSRV 和对应版本 API。
+桌面渲染依赖 eframe，只启用 `glow` 和 `default_fonts`。窗口吸附阶段增加按平台编译的原生绑定，具体用途与安全边界见 [窗口与输入框定位](window-positioning.md)。托盘、配置序列化和音频库后续按需引入，不预装完整 async 运行时或大型引擎。升级 GUI 库时需要重新核对 MSRV 和对应版本 API。
 
 ## 代码边界
 
@@ -50,7 +50,8 @@ flowchart LR
     Input --> Core[bongodsh-core 按键状态机]
     Core --> Motion[双手弹簧动画]
     Motion --> Render[egui 原创角色绘制]
-    Bridge --> Shell[窗口位置与任务提醒，待实现]
+    Layout[原生窗口与辅助功能边界] --> Shell[窗口吸附与全屏摆放]
+    Bridge --> Shell
     Shell --> Render
 ```
 
@@ -89,6 +90,8 @@ DSH 内的输入框属于页面布局，桌面窗口 API 不能提供它的精�
 3. **独立挂件。** 接入全局键盘、权限提示、暂停、托盘、穿透、音量与配置持久化；异常恢复后没有卡住的手或残留监听线程。
 4. **DSH 联动。** 输入框定位、窗口跟随、任务提醒、断连恢复，验收输入事件无重复和不同 DPI 下的坐标一致性。
 5. **可分发版本。** 自定义素材、性能测量、签名和安装包；发布授权单独处理。
+
+窗口吸附已提前接入独立挂件：拖动后跟随可见窗口或可识别输入框，全屏时默认放到右下角。通用辅助功能定位不替代 DSH 显式桥接；权限、坐标和运行验收边界见 [定位说明](window-positioning.md)。
 
 第一版性能目标是静止时按需等待、动作时才连续重绘，键盘输入到首次视觉反馈争取控制在 50ms 内。这里只定义验收目标，不代表已有性能实测结果。
 
