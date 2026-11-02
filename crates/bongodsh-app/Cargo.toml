@@ -1,0 +1,19 @@
+[package]
+name = "bongodsh-app"
+description = "Transparent desktop typing companion for BongoDSH"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "bongodsh"
+path = "src/main.rs"
+
+[dependencies]
+bongodsh-core.workspace = true
+eframe.workspace = true
+
+[lints]
+workspace = true
