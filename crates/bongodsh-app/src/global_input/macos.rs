@@ -16,7 +16,7 @@ use objc2_core_foundation::{
 use objc2_core_graphics::{
     CGEvent, CGEventField, CGEventFlags, CGEventSource, CGEventSourceStateID, CGEventTapLocation,
     CGEventTapOptions, CGEventTapPlacement, CGEventTapProxy, CGEventType,
-    CGPreflightListenEventAccess, CGRequestListenEventAccess,
+    CGPreflightListenEventAccess,
 };
 
 use super::{
@@ -51,12 +51,21 @@ unsafe extern "C" {
     fn IONotificationPortDestroy(port: *mut c_void);
 }
 
+// SAFETY: IOHIDLib.h declares a C enum argument and a C bool result.
+#[link(name = "IOKit", kind = "framework")]
+unsafe extern "C" {
+    fn IOHIDRequestAccess(request_type: std::ffi::c_int) -> bool;
+}
+
 pub(super) fn has_permission() -> bool {
     CGPreflightListenEventAccess()
 }
 
 pub(super) fn request_permission() -> bool {
-    CGRequestListenEventAccess()
+    // SAFETY: kIOHIDRequestTypeListenEvent is 1 in IOHIDLib.h. This no-pointer
+    // request runs only after the user clicks the permission button. IOKit
+    // registers the app for Input Monitoring without creating an event tap.
+    unsafe { IOHIDRequestAccess(1) }
 }
 
 pub(super) fn open_permission_settings() -> Result<(), String> {
@@ -67,6 +76,24 @@ pub(super) fn open_permission_settings() -> Result<(), String> {
         .success()
         .then_some(())
         .ok_or_else(|| "Cannot open System Settings".to_owned())
+}
+
+pub(super) fn reveal_application() -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let bundle = executable
+        .ancestors()
+        .find(|path| path.extension().is_some_and(|extension| extension == "app"))
+        .ok_or_else(|| {
+            "Run the packaged .app to locate it here; see docs/global-keyboard.md".to_owned()
+        })?;
+    std::process::Command::new("/usr/bin/open")
+        .arg("-R")
+        .arg(bundle)
+        .status()
+        .map_err(|error| error.to_string())?
+        .success()
+        .then_some(())
+        .ok_or_else(|| "Cannot reveal this app in Finder".to_owned())
 }
 
 fn secure_input() -> bool {

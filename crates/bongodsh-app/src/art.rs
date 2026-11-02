@@ -1,8 +1,10 @@
 use std::f32::consts::TAU;
 
-use eframe::egui::{Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2, pos2, vec2};
+use eframe::egui::{
+    Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2, emath::TSTransform, pos2, vec2,
+};
 
-use bongodsh_core::animation::HandPositions;
+use bongodsh_core::{Hand, animation::HandPositions};
 
 pub(crate) const INK: Color32 = Color32::from_rgb(42, 67, 82);
 const BODY: Color32 = Color32::from_rgb(162, 215, 221);
@@ -10,10 +12,69 @@ const SHADE: Color32 = Color32::from_rgb(117, 182, 196);
 const BELLY: Color32 = Color32::from_rgb(235, 248, 246);
 const BLUSH: Color32 = Color32::from_rgb(238, 171, 160);
 
-pub(crate) fn draw(painter: &Painter, bounds: Rect, hands: HandPositions) {
-    let origin = bounds.min;
-    let activity = hands.left.max(hands.right).clamp(0.0, 1.0);
-    let body_center = origin + vec2(142.0, 124.0 + activity * 3.0);
+#[derive(Clone, Copy)]
+pub(crate) struct CharacterLayout {
+    transform: TSTransform,
+}
+
+impl CharacterLayout {
+    pub(crate) fn new(bounds: Rect, scale: f32) -> Self {
+        Self {
+            transform: TSTransform::new(
+                vec2(bounds.center().x - 150.0 * scale, bounds.min.y),
+                scale,
+            ),
+        }
+    }
+
+    pub(crate) fn hit_bounds(self) -> Rect {
+        self.transform * Rect::from_min_max(pos2(53.0, 35.0), pos2(269.0, 234.0))
+    }
+
+    pub(crate) fn hand_at(self, point: Pos2, hands: HandPositions, travel: f32) -> Option<Hand> {
+        let local = self.transform.inverse() * point;
+        for (hand, x, progress) in [
+            (Hand::Left, 98.0, hands.left),
+            (Hand::Right, 181.0, hands.right),
+        ] {
+            let (center, _, _) = hand_pose(pos2(x, 184.0), progress, hand, travel);
+            if ((local - center) / vec2(30.0, 23.0)).length_sq() <= 1.0 {
+                return Some(hand);
+            }
+        }
+        None
+    }
+}
+
+struct Drawing<'a> {
+    painter: &'a Painter,
+    transform: TSTransform,
+}
+
+impl Drawing<'_> {
+    fn add(&self, mut shape: Shape) {
+        shape.transform(self.transform);
+        self.painter.add(shape);
+    }
+
+    fn circle_filled(&self, center: Pos2, radius: f32, color: Color32) {
+        self.add(Shape::circle_filled(center, radius, color));
+    }
+
+    fn line_segment(&self, points: [Pos2; 2], stroke: Stroke) {
+        self.add(Shape::line_segment(points, stroke));
+    }
+}
+
+pub(crate) fn draw(painter: &Painter, layout: CharacterLayout, hands: HandPositions, travel: f32) {
+    let drawing = Drawing {
+        painter,
+        transform: layout.transform,
+    };
+    let painter = &drawing;
+    let origin = Pos2::ZERO;
+    let activity = ((hands.left + hands.right) * 0.5).clamp(-0.16, 1.0);
+    let body_center = origin + vec2(142.0, 124.0 + activity * 1.3);
 
     ellipse(
         painter,
@@ -34,7 +95,7 @@ pub(crate) fn draw(painter: &Painter, bounds: Rect, hands: HandPositions) {
     ellipse(
         painter,
         body_center,
-        vec2(80.0 + activity * 2.0, 65.0 - activity * 3.0),
+        vec2(80.0 + activity * 0.6, 65.0 - activity * 0.8),
         0.0,
         BODY,
         3.0,
@@ -58,7 +119,7 @@ pub(crate) fn draw(painter: &Painter, bounds: Rect, hands: HandPositions) {
 
     for x in [-25.0, 23.0] {
         let eye = body_center + vec2(x, -8.0);
-        ellipse(painter, eye, vec2(4.5, 5.5 - activity * 1.8), 0.0, INK, 0.0);
+        ellipse(painter, eye, vec2(4.5, 5.5 - activity * 0.4), 0.0, INK, 0.0);
         painter.circle_filled(eye + vec2(-1.2, -1.8), 1.3, Color32::WHITE);
         ellipse(
             painter,
@@ -102,41 +163,64 @@ pub(crate) fn draw(painter: &Painter, bounds: Rect, hands: HandPositions) {
         2.0,
     );
 
-    draw_hand(painter, origin + vec2(98.0, 184.0), hands.left, -0.12);
-    draw_hand(painter, origin + vec2(181.0, 184.0), hands.right, 0.12);
+    draw_hand(
+        painter,
+        origin + vec2(98.0, 184.0),
+        hands.left,
+        Hand::Left,
+        travel,
+    );
+    draw_hand(
+        painter,
+        origin + vec2(181.0, 184.0),
+        hands.right,
+        Hand::Right,
+        travel,
+    );
 }
 
-fn draw_hand(painter: &Painter, center: Pos2, progress: f32, angle: f32) {
-    let press = progress.clamp(-0.2, 1.15);
-    let hand = center + vec2(0.0, press * 17.0);
+fn hand_pose(center: Pos2, progress: f32, side: Hand, travel: f32) -> (Pos2, Vec2, f32) {
+    let press = progress.clamp(-0.16, 1.12);
+    let direction = if side == Hand::Left { -1.0 } else { 1.0 };
+    let contact = ((press - 0.55) / 0.45).clamp(0.0, 1.2);
+    let hand = center + vec2(direction * press * 2.5, press * 20.0 * travel);
+    let radii = vec2(23.0 + contact * 3.0, 17.0 - contact * 4.5);
+    (hand, radii, direction * (0.16 - press * 0.23))
+}
+
+fn draw_hand(painter: &Drawing<'_>, center: Pos2, progress: f32, side: Hand, travel: f32) {
+    let press = progress.clamp(-0.16, 1.12);
+    let (hand, radii, angle) = hand_pose(center, progress, side, travel);
+    let contact = press.clamp(0.0, 1.0);
     ellipse(
         painter,
-        center + vec2(0.0, 25.0),
-        vec2(21.0 + press * 3.0, 3.5),
+        center + vec2(0.0, 20.0 * travel + 14.0),
+        vec2(15.0 + contact * 8.0, 2.0 + contact * 1.5),
         0.0,
-        Color32::from_black_alpha(15),
+        Color32::from_black_alpha((7.0 + contact * 14.0) as u8),
         0.0,
     );
-    ellipse(
-        painter,
-        hand,
-        vec2(24.0 + press * 3.0, 19.0 - press * 5.0),
-        angle * (1.0 - press),
-        BELLY,
-        3.0,
-    );
+    ellipse(painter, hand, radii, angle, BELLY, 3.0);
+    let rotation = eframe::egui::emath::Rot2::from_angle(angle);
     for x in [-7.0, 7.0] {
         painter.line_segment(
             [
-                hand + vec2(x, 8.0 - press * 3.0),
-                hand + vec2(x, 13.0 - press * 4.0),
+                hand + rotation * vec2(x, radii.y * 0.35),
+                hand + rotation * vec2(x, radii.y * 0.64),
             ],
             Stroke::new(1.6, SHADE),
         );
     }
 }
 
-fn ellipse(painter: &Painter, center: Pos2, radii: Vec2, angle: f32, fill: Color32, outline: f32) {
+fn ellipse(
+    painter: &Drawing<'_>,
+    center: Pos2,
+    radii: Vec2,
+    angle: f32,
+    fill: Color32,
+    outline: f32,
+) {
     let (sin, cos) = angle.sin_cos();
     let points = (0..48)
         .map(|index| {
@@ -152,28 +236,14 @@ fn ellipse(painter: &Painter, center: Pos2, radii: Vec2, angle: f32, fill: Color
     ));
 }
 
-pub(crate) fn hit_bounds(bounds: Rect) -> Rect {
-    Rect::from_min_max(
-        bounds.min + vec2(53.0, 35.0),
-        bounds.min + vec2(269.0, 219.0),
-    )
-}
-
-pub(crate) fn close_icon(painter: &Painter, bounds: Rect) {
-    for sign in [-1.0, 1.0] {
+pub(crate) fn menu_icon(painter: &Painter, bounds: Rect) {
+    for y in [-4.0, 0.0, 4.0] {
         painter.line_segment(
             [
-                bounds.center() + vec2(-4.0, sign * -4.0),
-                bounds.center() + vec2(4.0, sign * 4.0),
+                bounds.center() + vec2(-5.0, y),
+                bounds.center() + vec2(5.0, y),
             ],
             Stroke::new(1.5, INK),
         );
     }
-}
-
-pub(crate) fn hint_bounds(bounds: Rect) -> Rect {
-    Rect::from_center_size(
-        pos2(bounds.center().x, bounds.min.y + 241.0),
-        vec2(214.0, 26.0),
-    )
 }

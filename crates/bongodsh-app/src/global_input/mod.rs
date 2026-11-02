@@ -51,6 +51,11 @@ pub(crate) fn open_permission_settings() -> Result<(), String> {
     platform::open_permission_settings()
 }
 
+#[cfg(target_os = "macos")]
+pub(crate) fn reveal_application() -> Result<(), String> {
+    platform::reveal_application()
+}
+
 #[derive(Clone)]
 struct Sink {
     events: SyncSender<InputEvent>,
