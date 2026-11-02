@@ -13,6 +13,8 @@ publish = false
 [workspace.dependencies]
 bongodsh-core = { path = "crates/bongodsh-core" }
 eframe = { version = "0.34.3", default-features = false, features = ["default_fonts", "glow"] }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+rfd = { version = "0.17.2", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

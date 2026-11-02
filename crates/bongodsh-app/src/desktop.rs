@@ -8,6 +8,8 @@ use eframe::egui::{
 use bongodsh_core::{InputEvent, KeyId, TypingState, animation::HandAnimation};
 
 use crate::{
+    appearance::{self, Appearance},
+    appearance_ui::{self, AppearanceUi},
     art,
     global_input::{GlobalInput, Status},
     input,
@@ -20,7 +22,7 @@ enum InputSource {
     Global,
 }
 
-pub(crate) fn run() -> eframe::Result {
+pub(crate) fn run(open_appearance: bool) -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("BongoDSH")
@@ -38,7 +40,11 @@ pub(crate) fn run() -> eframe::Result {
     eframe::run_native(
         "BongoDSH",
         options,
-        Box::new(|creation| Ok(Box::new(Desktop::new(&creation.egui_ctx)))),
+        Box::new(move |creation| {
+            let mut desktop = Desktop::new(&creation.egui_ctx);
+            desktop.appearance_ui.open = open_appearance;
+            Ok(Box::new(desktop))
+        }),
     )
 }
 
@@ -60,6 +66,8 @@ struct Desktop {
     global: GlobalInput,
     keyboard_settings_open: bool,
     settings_error: Option<String>,
+    appearance: Appearance,
+    appearance_ui: AppearanceUi,
 }
 
 impl Desktop {
@@ -84,6 +92,8 @@ impl Desktop {
             global: GlobalInput::default(),
             keyboard_settings_open: false,
             settings_error: None,
+            appearance: Appearance::new(ctx, appearance::data_path()),
+            appearance_ui: AppearanceUi::default(),
         }
     }
 
@@ -287,7 +297,20 @@ impl Desktop {
             ui.close();
         }
         if ui
-            .button(self.text("演示双手动作", "Play hand animation"))
+            .button(self.text("角色与图片…", "Character & images…"))
+            .clicked()
+        {
+            self.appearance_ui.open = true;
+            self.demo = None;
+            self.restart_input(ui.ctx());
+            ui.ctx().send_viewport_cmd_to(
+                egui::ViewportId::from_hash_of(appearance_ui::VIEWPORT),
+                ViewportCommand::Focus,
+            );
+            ui.close();
+        }
+        if ui
+            .button(self.text("演示按键动作", "Play typing animation"))
             .clicked()
         {
             self.start_demo();
@@ -324,6 +347,13 @@ impl Desktop {
 impl eframe::App for Desktop {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let now = Instant::now();
+        if self.appearance.poll(ctx) && self.appearance_ui.open {
+            ctx.request_repaint_of(egui::ViewportId::from_hash_of(appearance_ui::VIEWPORT));
+        }
+        if self.appearance_ui.dropped(ctx, &mut self.appearance) {
+            self.demo = None;
+            self.restart_input(ctx);
+        }
         let events = self.global.poll();
         if !self.paused && self.demo.is_none() {
             for event in events {
@@ -350,14 +380,27 @@ impl eframe::App for Desktop {
             .advance(now.saturating_duration_since(self.last_frame))
         {
             ctx.request_repaint_after(Duration::from_millis(16));
+            if self.appearance_ui.open {
+                ctx.request_repaint_after_for(
+                    Duration::from_millis(16),
+                    egui::ViewportId::from_hash_of(appearance_ui::VIEWPORT),
+                );
+            }
         }
         self.last_frame = now;
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let bounds = ui.max_rect();
         let response = ui.interact(
-            art::hit_bounds(bounds),
+            if self.appearance.layers()[0].is_some() {
+                Rect::from_min_max(
+                    bounds.min + vec2(23.0, 20.0),
+                    bounds.min + vec2(277.0, 219.0),
+                )
+            } else {
+                art::hit_bounds(bounds)
+            },
             ui.id().with("character"),
             // Typing Enter/Space must animate hands, not activate a focused button.
             Sense::CLICK | Sense::DRAG,
@@ -367,7 +410,12 @@ impl eframe::App for Desktop {
         }
         response.context_menu(|ui| self.menu(ui));
         let response = response.on_hover_cursor(egui::CursorIcon::Grab);
-        art::draw(ui.painter(), bounds, self.animation.positions());
+        art::draw_character(
+            ui.painter(),
+            bounds,
+            self.animation.positions(),
+            self.appearance.layers(),
+        );
 
         if response.hovered() || self.focused || self.paused || self.demo.is_some() {
             let close_rect = Rect::from_min_size(bounds.min + vec2(260.0, 12.0), vec2(25.0, 25.0));
@@ -396,7 +444,7 @@ impl eframe::App for Desktop {
                 )
             } else if self.demo.is_some() {
                 (
-                    self.text("双手动作演示中", "Playing hand animation"),
+                    self.text("按键动作演示中", "Playing typing animation"),
                     Color32::from_rgb(63, 144, 146),
                 )
             } else if self.global_selected() {
@@ -429,10 +477,52 @@ impl eframe::App for Desktop {
             );
         }
         self.keyboard_window(ui.ctx());
+        let ctx = ui.ctx().clone();
+        self.appearance_ui.show(
+            &ctx,
+            &mut self.appearance,
+            self.animation.positions(),
+            self.chinese_font,
+        );
+        if std::mem::take(&mut self.appearance_ui.play) {
+            self.start_demo();
+            ctx.request_repaint();
+        }
+        if let Some(part) = self
+            .appearance_ui
+            .pick
+            .take()
+            .filter(|_| !self.appearance.busy())
+        {
+            self.demo = None;
+            self.global.stop();
+            self.reset();
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            if let Some(path) = rfd::FileDialog::new()
+                .set_title(self.text("选择角色图层", "Choose a character layer"))
+                .add_filter("Images", &["png", "jpg", "jpeg", "webp"])
+                .set_parent(frame)
+                .pick_file()
+            {
+                self.appearance.import(path, part, &ctx);
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            let _ = (frame, part);
+            self.restart_input(&ctx);
+            self.last_frame = Instant::now();
+            ctx.send_viewport_cmd_to(
+                egui::ViewportId::from_hash_of(appearance_ui::VIEWPORT),
+                ViewportCommand::Focus,
+            );
+            ctx.request_repaint();
+        }
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.global.stop();
+        if let Err(problem) = self.appearance.flush() {
+            eprintln!("{}", problem.message(self.chinese_font));
+        }
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {

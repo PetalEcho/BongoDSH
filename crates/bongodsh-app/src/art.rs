@@ -1,6 +1,6 @@
 use std::f32::consts::TAU;
 
-use eframe::egui::{Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2, pos2, vec2};
+use eframe::egui::{Color32, Painter, Pos2, Rect, Shape, Stroke, TextureHandle, Vec2, pos2, vec2};
 
 use bongodsh_core::animation::HandPositions;
 
@@ -9,6 +9,69 @@ const BODY: Color32 = Color32::from_rgb(162, 215, 221);
 const SHADE: Color32 = Color32::from_rgb(117, 182, 196);
 const BELLY: Color32 = Color32::from_rgb(235, 248, 246);
 const BLUSH: Color32 = Color32::from_rgb(238, 171, 160);
+
+pub(crate) fn draw_character(
+    painter: &Painter,
+    bounds: Rect,
+    hands: HandPositions,
+    layers: [Option<&TextureHandle>; 3],
+) {
+    let Some(body) = layers[0] else {
+        draw(painter, bounds, hands);
+        return;
+    };
+    let area = Rect::from_min_max(
+        bounds.min + vec2(27.0, 24.0),
+        bounds.min + vec2(273.0, 197.0),
+    );
+    let fitted = fit_image(area, body.size_vec2());
+    let activity = hands.left.max(hands.right).clamp(0.0, 1.0);
+    let size = fitted.size() * vec2(1.0 + activity * 0.025, 1.0 - activity * 0.035);
+    paint_texture(
+        painter,
+        body,
+        Rect::from_min_size(
+            pos2(fitted.center().x - size.x / 2.0, fitted.bottom() - size.y),
+            size,
+        ),
+    );
+    for (layer, x, progress) in [
+        (layers[1], 98.0, hands.left),
+        (layers[2], 181.0, hands.right),
+    ] {
+        if let Some(texture) = layer {
+            let press = progress.clamp(-0.2, 1.15);
+            let center = bounds.min + vec2(x, 184.0 + press * 17.0);
+            let fitted = fit_image(
+                Rect::from_center_size(center, vec2(56.0, 46.0)),
+                texture.size_vec2(),
+            );
+            paint_texture(
+                painter,
+                texture,
+                Rect::from_center_size(
+                    center,
+                    fitted.size() * vec2(1.0 + press * 0.08, 1.0 - press * 0.18),
+                ),
+            );
+        }
+    }
+}
+
+pub(crate) fn paint_texture(painter: &Painter, texture: &TextureHandle, bounds: Rect) {
+    painter.image(
+        texture.id(),
+        bounds,
+        Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)),
+        Color32::WHITE,
+    );
+}
+
+pub(crate) fn fit_image(area: Rect, size: Vec2) -> Rect {
+    let size = size.max(Vec2::splat(1.0));
+    let fitted = size * (area.width() / size.x).min(area.height() / size.y);
+    Rect::from_center_size(area.center(), fitted)
+}
 
 pub(crate) fn draw(painter: &Painter, bounds: Rect, hands: HandPositions) {
     let origin = bounds.min;
@@ -101,39 +164,6 @@ pub(crate) fn draw(painter: &Painter, bounds: Rect, hands: HandPositions) {
         BODY,
         2.0,
     );
-
-    draw_hand(painter, origin + vec2(98.0, 184.0), hands.left, -0.12);
-    draw_hand(painter, origin + vec2(181.0, 184.0), hands.right, 0.12);
-}
-
-fn draw_hand(painter: &Painter, center: Pos2, progress: f32, angle: f32) {
-    let press = progress.clamp(-0.2, 1.15);
-    let hand = center + vec2(0.0, press * 17.0);
-    ellipse(
-        painter,
-        center + vec2(0.0, 25.0),
-        vec2(21.0 + press * 3.0, 3.5),
-        0.0,
-        Color32::from_black_alpha(15),
-        0.0,
-    );
-    ellipse(
-        painter,
-        hand,
-        vec2(24.0 + press * 3.0, 19.0 - press * 5.0),
-        angle * (1.0 - press),
-        BELLY,
-        3.0,
-    );
-    for x in [-7.0, 7.0] {
-        painter.line_segment(
-            [
-                hand + vec2(x, 8.0 - press * 3.0),
-                hand + vec2(x, 13.0 - press * 4.0),
-            ],
-            Stroke::new(1.6, SHADE),
-        );
-    }
 }
 
 fn ellipse(painter: &Painter, center: Pos2, radii: Vec2, angle: f32, fill: Color32, outline: f32) {
