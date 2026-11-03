@@ -51,10 +51,8 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   panel.setAttribute('aria-label', 'BongoDSH 设置');
   panel.innerHTML = `
     <div class="heading"><strong>BongoDSH</strong><button class="close" type="button" aria-label="关闭设置">×</button></div>
-    <p>打字时，角色随你的节奏轻轻动一动。</p>
     <label class="row" for="bongo-character">角色</label>
     <select id="bongo-character" name="character"></select>
-    <p class="note character-note"></p>
     <label class="row">暂停动作<input name="paused" type="checkbox"></label>
     <label class="row">跟随输入框<input name="docked" type="checkbox"></label>
     <label class="row" for="bongo-size">角色大小<output for="bongo-size"></output></label>
@@ -65,13 +63,11 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     <input id="bongo-body-amplitude" name="bodyAmplitude" type="range" min="0" max="200" step="10">
     <div class="actions"><button type="button" class="action reset">恢复位置</button></div>
     <button type="button" class="action desktop">移到桌面</button>
-    <p class="note desktop-status" role="status">拖出窗口可移到桌面，并吸附其他程序窗口。</p>
-    <p class="note anchor-status"></p>
-    <p class="note">仅响应当前页面的物理按键，不保存输入内容。</p>
-    <p class="note notice" role="status" hidden>设置暂时无法保存，当前页面仍可使用。</p>`;
+    <p class="note desktop-status" role="status" hidden></p>
+    <p class="note anchor-status" hidden>未找到输入框，暂靠页面边缘。</p>
+    <p class="note notice" role="status" hidden>设置未保存，当前页面仍可使用。</p>`;
   shadow.append(pet, hint, panel);
   const characterInput = panel.querySelector('[name=character]');
-  const characterNote = panel.querySelector('.character-note');
   for (const character of characters) {
     const option = document.createElement('option');
     option.value = character.id;
@@ -145,6 +141,11 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     else { syncSettings(); schedulePlace(); }
   }
 
+  function setDesktopStatus(message = '') {
+    desktopStatus.textContent = message;
+    desktopStatus.hidden = !message;
+  }
+
   async function checkDesktop() {
     win.clearTimeout(desktopTimer);
     desktopTimer = 0;
@@ -160,12 +161,10 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
       syncDesktopSettings(status, current);
       if (current) setDetached(status.active === true);
       else if (!detachPending) desktopCheckQueued = true;
-      desktopStatus.textContent = status.available
-        ? '拖出窗口后，靠近其他程序的窗口边缘松手即可吸附。'
-        : '尚未安装桌面组件，请按插件说明完成桌面设置。';
+      setDesktopStatus(status.available ? '' : '未安装桌面组件，请按插件说明设置。');
     } catch {
       if (!disposed) {
-        desktopStatus.textContent = '拖出功能需要本机 DSH 和已构建的桌面挂件。';
+        setDesktopStatus('桌面连接不可用，请检查本机 DSH 和桌面组件。');
       }
     } finally { checkingDesktop = false; }
     if (!disposed && !document.hidden && !detachPending && (desktopCheckQueued || detached)) {
@@ -177,7 +176,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   async function detachToDesktop(grabX = 0.5, grabY = 0.5) {
     if (detachPending || detached || disposed) return;
     if (!desktopBridge) {
-      desktopStatus.textContent = '请在本机 DSH 中使用拖出功能。';
+      setDesktopStatus('请在本机 DSH 中移到桌面。');
       openPanel();
       return;
     }
@@ -185,7 +184,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     const version = ++desktopVersion;
     let stale = false;
     desktopButton.disabled = true;
-    desktopStatus.textContent = '正在移到桌面…';
+    setDesktopStatus('正在移到桌面…');
     resetInput();
     try {
       const status = await desktopBridge.detach(settings.character, settings.size, grabX, grabY,
@@ -200,8 +199,8 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
       endDrag(true);
       stale = version !== desktopVersion;
       if (!stale) {
-        desktopStatus.textContent = error.message;
-        if (!document.hidden) openPanel();
+        setDesktopStatus(error.message || '移到桌面失败，请重试。');
+        if (!document.hidden) openPanel(false);
       }
     } finally {
       detachPending = false;
@@ -233,16 +232,17 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     if (artwork.svg.dataset.character !== settings.character) {
       const character = artwork.select(settings.character);
       pet.setAttribute('aria-label', `BongoDSH ${character.label}，点击设置或拖动位置`);
-      characterNote.textContent = character.leftHand || character.rightHand
-        ? '身体与双手独立动作。' : '随按键轻轻压下身体。';
     }
     characterInput.value = settings.character;
     pauseInput.checked = settings.paused;
     dockInput.checked = settings.docked;
     sizeInput.value = String(settings.size);
+    sizeInput.style.setProperty('--range-progress', `${(settings.size - 100) / 120 * 100}%`);
     output.textContent = `${settings.size} px`;
     handAmplitudeInput.value = String(settings.handAmplitude);
     bodyAmplitudeInput.value = String(settings.bodyAmplitude);
+    handAmplitudeInput.style.setProperty('--range-progress', `${settings.handAmplitude / 2}%`);
+    bodyAmplitudeInput.style.setProperty('--range-progress', `${settings.bodyAmplitude / 2}%`);
     handAmplitudeOutput.textContent = `${settings.handAmplitude}%`;
     bodyAmplitudeOutput.textContent = `${settings.bodyAmplitude}%`;
     pet.dataset.paused = String(settings.paused);
@@ -302,9 +302,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     host.style.width = `${box.width}px`;
     host.style.height = `${box.height}px`;
     host.style.transform = `translate(${box.x}px, ${box.y}px)`;
-    anchorStatus.textContent = settings.docked
-      ? (rect ? '已跟随输入框上沿。' : '未找到可见输入框，暂时停靠页面边缘。')
-      : '自由放置，可拖动角色调整位置。';
+    anchorStatus.hidden = !settings.docked || !!rect;
     positionPanel();
   }
 
@@ -350,14 +348,14 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     restoreFocus = null;
   }
 
-  function openPanel() {
+  function openPanel(refreshDesktop = true) {
     resetInput();
     restoreFocus = document.activeElement === host ? pet : document.activeElement;
     panel.hidden = false;
     pet.setAttribute('aria-expanded', 'true');
     positionPanel();
     closeButton.focus({ preventScroll: true });
-    void checkDesktop();
+    if (refreshDesktop) void checkDesktop();
   }
 
   function ownEvent(event) { return event.composedPath().includes(host); }

@@ -1,87 +1,77 @@
 # BongoDSH
 
-使用 Rust 开发的桌面打字挂件，目标为 macOS 和 Windows。DSH 页面插件提供六个彩色角色，可拖出为独立桌面窗口并吸附其他程序的窗口边缘。独立启动的桌面原型保留矢量小鲸鱼。
+DSH 打字挂件，提供六款彩色角色、独立双手动画和桌面模式。角色可贴在输入框上沿，也可拖出 DSH，吸附其他程序的窗口边缘。
 
-## 当前进度
+## 下载与安装
 
-已实现 egui/eframe 桌面原型，包含透明置顶窗口、角色拖动、双手按键动画和 macOS / Windows 全局键盘监听。首次默认只响应挂件窗口内的按键，右键可开启全局模式；之后自动恢复保存的输入模式。DSH 页面插件支持按键动画、输入框吸附、设置保存和拖出桌面；音效和任务提醒尚未接入。
+当前版本 **0.2.4**。从 [GitHub Releases](https://github.com/PetalEcho/BongoDSH/releases/tag/v0.2.4) 下载：
 
-| 部分 | 当前状态 |
+| 安装包 | 适用范围 |
 | --- | --- |
-| 双手交替、长按去重、多键保持、断连重置 | 已实现核心规则 |
-| 独立桌面窗口与角色动画 | 已实现 egui/eframe 0.34.3 原型 |
-| macOS / Windows 全局输入与权限 | 已实现原生适配与 macOS 主动授权入口，实机验证边界见下文 |
-| 角色拖动、右键菜单、暂停与退出 | 已实现 |
-| 点击穿透、托盘与本地设置 | 规划 |
-| DSH 页面插件 | 已实现独立 Web bundle，已在 macOS DSH 中安装并验证六个角色显示与切换 |
-| DSH 拖出桌面、其他程序窗口边缘吸附 | 已实现；验证边界见 [桌面桥接](docs/desktop-bridge.md) |
-| 原生输入框定位与任务提醒 | 后续阶段 |
+| `dsh-bongodsh-0.2.4-darwin-arm64.tgz` | macOS Apple Silicon，包含页面插件、全部角色素材和桌面组件 |
+| `dsh-bongodsh-0.2.4-web.tgz` | DSH 页面模式，不含桌面组件 |
+| `SHA256SUMS.txt` | 两个安装包的 SHA-256 校验值 |
 
-## DSH 插件版
-
-直接在 DSH 内显示角色，无需运行 Rust 程序。从仓库根目录执行：
+需要 DSH `0.2.1-rc.5` 或更高版本，实际安装验证使用 `0.2.1-rc.5`。在 DSH「插件 → 添加插件」中填写下载文件的绝对路径，安装后启用。也可以运行：
 
 ```sh
-dsh plugin --profile web add ./plugins/dsh-bongodsh
+dsh plugin --profile web add /absolute/path/dsh-bongodsh-0.2.4-darwin-arm64.tgz
 ```
 
-插件按本机 DSH `0.2.1-rc.5` 的接口实现。默认角色为基础女仆鱼，支持六个彩色角色切换、页面按键、输入框吸附、拖动、暂停、尺寸及手部和身体幅度调整与本地设置保存；不监听其他应用，不申请系统键盘权限。素材原图和线稿保存在根目录 `assets/`，来源与接入方式见 [角色接入记录](docs/dsh-character-assets.md)。安装、打包、预览及兼容边界见 [插件说明](plugins/dsh-bongodsh/README.md)。
+安装通用包时替换文件名。`web` 是 profile 名称，按自己的 DSH 实例调整。安装或升级后重启对应 DSH 实例并刷新页面。
 
-使用拖出功能前运行 `cargo build --workspace --release --locked`。将角色拖出 DSH 窗口，或在角色设置中选择「移到桌面」，靠近其他程序窗口边缘后松手即可吸附。桌面右键面板支持与页面一致的角色切换、暂停、大小、独立手部和身体幅度及恢复位置，角色、大小、暂停及两项幅度会同步回 DSH。关闭设置不会退出挂件，选择「返回 DSH」才恢复页面角色。首次拖出只响应角色窗口内按键；在「桌面选项」中开启全局键盘后，重启或重新拖出会自动恢复选择。页面模式无需 Rust 程序。
+完整包已包含桌面程序，无需安装 Rust。当前未提供 Windows 或 Intel Mac 桌面安装包；这些平台可以使用页面包。macOS 包未经过 Developer ID 签名和公证。
+
+## 使用
+
+- 页面角色可点击或右键打开设置，桌面角色使用右键；Escape 收起设置。
+- 切换角色、暂停动作，调整角色大小及手部、身体幅度。幅度为 0–200%，0% 关闭对应部位的动作。
+- 在页面中拖动角色自由放置，开启「跟随输入框」可贴近输入框。
+- 拖出 DSH 窗口，或点击「移到桌面」。桌面模式可吸附其他窗口；点击「返回 DSH」回到页面。
+- 在桌面设置中展开「桌面选项」，开启「全局键盘」，即可响应其他程序中的按键。选择会保存在本机，重启或重新拖出后自动恢复。
+
+角色、暂停、大小及两项幅度会在页面和桌面之间同步。页面位置与输入框跟随设置单独保留。全局键盘首次需要用户开启；macOS 还需要系统输入监控授权。缺少权限或监听失败时暂用窗口输入，系统限制期间暂停全局反馈。面板显示原因，保留已保存的选择。详见 [全局键盘说明](docs/global-keyboard.md)。
+
+只处理物理按键，不读取、记录或上传输入文字。页面模式只响应当前页面。当前没有音效、任务提醒、托盘或点击穿透。
+
+## 0.2.4 更新
+
+- 精简页面和桌面设置文字，保留必要的错误与权限提示。
+- 统一三条滑块的细轨道、圆形手柄、填充色和操作高度。
+- 插件、桌面程序和 App 版本统一，重新构建完整安装包。
+- 包含此前的角色精修、手部遮挡调整、紧贴输入框、跨程序吸附、独立动作幅度和全局键盘偏好保存。
 
 ## 本地开发
 
-需要 Rust stable 1.93 或更高版本。macOS 使用 Xcode Command Line Tools；Windows 使用 MSVC Rust 工具链和 Visual Studio C++ Build Tools。桌面依赖为 eframe 0.34.3，使用 Glow 渲染和内置基础字体，不需要 Node.js 或 Electron。
+Rust stable 1.93+；macOS 需要 Xcode Command Line Tools，Windows 需要 MSVC 工具链和 Visual Studio C++ Build Tools。插件构建需要 Node.js 22.19+，无需安装 Node 依赖。
 
 ```sh
 cargo run --locked --bin bongodsh
-cargo run --locked --bin bongodsh -- --demo
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features --locked
 cargo build --workspace --release --locked
 ```
 
-不带参数时启动桌面窗口。`--demo` 保留为终端模拟事件演示，`--help` 显示用法。
+独立启动显示矢量鲸鱼原型。DSH 使用六款 PNG 角色。页面插件的开发、安装及预览见 [插件 README](plugins/dsh-bongodsh/README.md)。
 
-点击角色后输入字母、数字或标点即可看到双手动作。按住保持，松开回弹；拖动角色移动窗口，右键菜单可暂停、切换置顶或退出。角色不配键盘图形。透明背景当前仍会接收鼠标，不等于点击穿透。
+构建当前平台完整包、通用页面包和校验文件：
 
-窗口输入模式在失去焦点时清空按键状态。全局模式在其他应用打字时也驱动动画，并忽略挂件窗口重复上报的事件。两种模式都只处理物理按键，不读取输入文字，也不根据输入法组合文本补造动画。中文输入法尚未专项实机验证。中文界面尝试读取系统字体，找不到字体时使用英文提示。
-
-本地回归用例位于被 Git 忽略的 `crates/bongodsh-core/tests/` 和 `crates/bongodsh-app/tests/`，遵循测试不提交的约定。新克隆仓库不包含这些用例，`cargo test` 通过不能视为已执行相同回归覆盖。
-
-## 全局键盘
-
-右键从 DSH 拖出的角色，展开「桌面选项」并选择全局键盘。独立启动的鲸鱼原型可选择「启用全局键盘」或「键盘输入设置…」。Windows 不要求管理员权限。macOS 首次使用时，在面板点击「申请输入监控权限」，按系统提示开启「隐私与安全性 → 输入监控」，然后点击「检查并重新连接」。通过终端或编辑器启动时，系统可能将权限归属到启动应用；授权后仍无法连接时，退出并重新启动挂件。
-
-未授权、撤销权限或监听失败时显示原因并回退到窗口输入，不会反复弹出申请。暂停和退出会停止监听；切换输入源、睡眠和监听中断会重置双手。macOS 安全输入期间暂停全局反馈，系统解除限制后恢复。输入模式会保存在本机，重启或重新拖出后自动恢复。暂停或权限失效不会覆盖已保存的选择；没有保存记录时使用窗口输入。
-
-本轮在 macOS Apple Silicon 上完成本地回归与未授权降级检查，Windows x86_64 MSVC 完成目标编译检查。已授权的跨应用输入、权限撤销、睡眠唤醒和 Windows 实机运行仍需人工验收。实现说明、限制与验收步骤见 [全局键盘监听](docs/global-keyboard.md)。
-
-## 目录
-
-```text
-assets/
-  concepts/         三个角色的独立身体与双手，保留线稿和彩稿
-  characters/       水手、睡衣、魔法师的独立身体与双手，保留线稿和彩稿
-plugins/
-  dsh-bongodsh/     DSH 页面插件、预编译客户端与本地预览
-crates/
-  bongodsh-core/     输入状态机、反馈结果与双手弹簧动画
-  bongodsh-app/      桌面窗口、原生绘制、窗口和全局键盘适配、命令行模拟
-docs/
-  project-baseline.md  产品基调、技术方向、分期和验收
-  global-keyboard.md   全局输入、权限流程与平台验证边界
-  rust-skills.md       Rust skills 候选与安装命令
-.github/workflows/ci.yml  macOS 与 Windows 编译检查
-AGENTS.md               项目开发约定
+```sh
+cd plugins/dsh-bongodsh
+npm run release
 ```
 
-## 项目方向与参考
+产物在 `plugins/dsh-bongodsh/dist/`。命令校验版本，生成并核对客户端与 PNG，重建桌面程序，再按平台分别打包。它只生成本地文件，不自动上传或发布。
 
-完整约定见 [项目基调](docs/project-baseline.md)，技能候选见 [Rust skills 清单](docs/rust-skills.md)。
+macOS 已验证页面显示、拖出、设置同步及全局键盘偏好恢复。Windows 完成目标编译检查，尚未实机验收。详细记录见 [插件验证记录](docs/plugin-validation.md)、[桌面桥接](docs/desktop-bridge.md)。本地回归位于忽略的测试目录，新克隆仓库不含这些用例，CI 的 `cargo test` 不代表同等回归覆盖。
 
-- [dsh-bongo-fish](https://github.com/YUsaltyfish/dsh-bongo-fish)：参考打字反馈、形象配置、输入框磁吸和任务提醒。
-- [dsh-whale-bongo](https://github.com/MeteorNOX/dsh-whale-bongo)：参考双手回弹、桌面模式、点击穿透和跨屏交互。
+## 源码与素材
 
-本项目独立实现 Rust 桌面程序和 DSH 页面插件，未复制上述项目的代码或音效。页面角色素材根据用户指定的参考图和附件生成，原始参考图未复制到仓库。素材来源与许可单独记录在 [ASSETS.md](plugins/dsh-bongodsh/ASSETS.md)；本项目的开源许可证尚未确定。
+- `crates/bongodsh-core/`：输入状态机和动作规则。
+- `crates/bongodsh-app/`：桌面窗口、绘制和系统输入适配。
+- `plugins/dsh-bongodsh/`：DSH 插件、客户端源码和打包脚本。
+- `assets/`：六款角色的身体、双手彩稿及线稿。
+- `docs/`：协议、平台边界和验证记录。
+
+交互参考 [dsh-bongo-fish](https://github.com/YUsaltyfish/dsh-bongo-fish) 和 [dsh-whale-bongo](https://github.com/MeteorNOX/dsh-whale-bongo)，未复制其代码或音效。角色素材由用户指定参考图和附件生成，来源与许可见 [素材说明](plugins/dsh-bongodsh/ASSETS.md)。项目许可证尚未确定。

@@ -227,61 +227,66 @@ impl Desktop {
     }
 
     fn keyboard_panel(&mut self, ui: &mut egui::Ui) {
-        ui.label(self.status_text());
-        if let Some(error) = &self.preferences_error {
-            ui.colored_label(Color32::from_rgb(160, 76, 60), error);
-        }
         ui.separator();
+        ui.label(self.text("键盘输入", "Keyboard input"));
         let mut source = self.source;
-        ui.radio_value(
-            &mut source,
-            InputSource::Window,
-            self.text("仅窗口内输入", "Input in this window"),
-        );
-        ui.radio_value(
-            &mut source,
-            InputSource::Global,
-            self.text(
-                "全局键盘 · 在其他应用打字也响应",
-                "Global keyboard, including other apps",
-            ),
-        );
+        ui.horizontal_wrapped(|ui| {
+            ui.radio_value(
+                &mut source,
+                InputSource::Window,
+                self.text("窗口输入", "Window"),
+            );
+            ui.radio_value(
+                &mut source,
+                InputSource::Global,
+                self.text("全局键盘", "Global"),
+            )
+            .on_hover_text(self.text(
+                "在其他应用打字时也响应，不读取输入文字。",
+                "Responds while typing in other apps without reading typed text.",
+            ));
+        });
         if source != self.source {
             self.switch_source(source, ui.ctx());
         }
-        ui.small(self.text(
-            "输入模式会保存在本机，重启后自动恢复。",
-            "Input mode is saved on this computer and restored after restart.",
-        ));
-        ui.add_space(8.0);
-        ui.label(self.text("只处理物理按键的按下和松开，不读取、保存或上传输入文字。", "Only physical key presses and releases are processed. Typed text is never read, stored or uploaded."));
+        if let Some(error) = &self.preferences_error {
+            ui.colored_label(Color32::from_rgb(160, 76, 60), error);
+        } else {
+            ui.small(self.text("重启后恢复此选择。", "Restored after restart."));
+        }
         if self.paused {
-            ui.label(self.text(
-                "暂停期间停止真实键盘监听。",
-                "Live capture is stopped while paused.",
-            ));
+            ui.small(self.text("键盘响应已暂停", "Keyboard response paused"));
+        } else if self.source == InputSource::Global {
+            ui.small(self.status_text());
         }
         if let Status::Failed(error) = self.global.status() {
             ui.colored_label(Color32::from_rgb(160, 76, 60), error);
         }
         #[cfg(target_os = "macos")]
-        {
-            ui.separator();
-            ui.label(self.text(
-                "macOS 需要“隐私与安全性 → 输入监控”授权。",
-                "macOS requires Privacy & Security > Input Monitoring.",
-            ));
-            ui.label(self.text("通过终端或编辑器启动时，系统可能列出启动它的应用。授权后若仍不可用，请退出并重新启动挂件。", "When launched from a terminal or editor, macOS may list that app. If capture remains unavailable after granting access, quit and relaunch BongoDSH."));
+        if self.source == InputSource::Global {
+            if matches!(
+                self.global.status(),
+                Status::PermissionRequired | Status::Failed(_)
+            ) {
+                ui.small(self.text(
+                    "请在系统“输入监控”中授权，必要时重启挂件。",
+                    "Allow Input Monitoring, then restart if needed.",
+                ))
+                .on_hover_text(self.text(
+                    "通过终端或编辑器启动时，系统可能列出启动它的应用。",
+                    "When launched from a terminal or editor, macOS may list that app.",
+                ));
+            }
             ui.horizontal_wrapped(|ui| {
                 if ui
-                    .button(self.text("申请输入监控权限", "Request Input Monitoring"))
+                    .button(self.text("授权输入监控", "Request access"))
                     .clicked()
                 {
                     crate::global_input::request_permission();
                     self.switch_source(InputSource::Global, ui.ctx());
                 }
                 if ui
-                    .button(self.text("打开系统设置", "Open System Settings"))
+                    .button(self.text("系统设置", "System Settings"))
                     .clicked()
                 {
                     self.settings_error = crate::global_input::open_permission_settings().err();
@@ -289,9 +294,7 @@ impl Desktop {
             });
         }
         if self.source == InputSource::Global
-            && ui
-                .button(self.text("检查并重新连接", "Check and reconnect"))
-                .clicked()
+            && ui.button(self.text("重新连接", "Reconnect")).clicked()
         {
             self.restart_input(ui.ctx());
         }

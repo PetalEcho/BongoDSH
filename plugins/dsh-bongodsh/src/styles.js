@@ -26,8 +26,18 @@ export const styles = `
   .row input[type=checkbox] { width: 16px; height: 16px; accent-color: #27768b; }
   select { width: 100%; padding: 6px 8px; border: 1px solid #bad5dc; border-radius: 7px;
     background: #fff; color: inherit; }
-  .character-note { margin: 6px 0; }
-  input[type=range] { display: block; width: 100%; margin: 6px 0 14px; accent-color: #27768b; }
+  input[type=range] { --range-fill: #27768b; --range-track: #c7dfe3; --range-thumb: #f5fbfc;
+    appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 24px;
+    margin: 0 0 6px; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+  input[type=range]:focus-visible { outline-color: var(--range-fill); outline-offset: 2px; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--range-fill) var(--range-progress, 50%), var(--range-track) var(--range-progress, 50%)); }
+  input[type=range]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; box-sizing: border-box;
+    width: 14px; height: 14px; margin-top: -5px; border: 2px solid var(--range-fill); border-radius: 50%; background: var(--range-thumb); }
+  input[type=range]::-moz-range-track { height: 4px; border: 0; border-radius: 2px; background: var(--range-track); }
+  input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--range-fill); }
+  input[type=range]::-moz-range-thumb { box-sizing: border-box; width: 14px; height: 14px;
+    border: 2px solid var(--range-fill); border-radius: 50%; background: var(--range-thumb); }
   output { font-variant-numeric: tabular-nums; color: #536b77; }
   .actions { display: flex; gap: 8px; margin: 10px 0; }
   .action { flex: 1; background: #e3f1f4; border: 1px solid #bad5dc; border-radius: 7px; padding: 6px 8px; }
@@ -40,6 +50,7 @@ export const styles = `
     p, output, .note { color: #b6ccd5; }
     .action { background: #345360; border-color: #5a7b88; color: #e4f3f6; }
     select { background: #345360; border-color: #5a7b88; }
+    input[type=range] { --range-fill: #9acbd7; --range-track: #537581; --range-thumb: #243b46; }
     .notice { color: #f5bea0; }
   }
   @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }

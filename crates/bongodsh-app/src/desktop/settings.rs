@@ -80,10 +80,6 @@ impl Palette {
         style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, self.accent);
         style.visuals.widgets.active.bg_stroke = Stroke::new(1.5, self.accent);
     }
-
-    fn note(&self, ui: &mut egui::Ui, message: &str) {
-        ui.label(RichText::new(message).size(11.0).color(self.muted));
-    }
 }
 
 impl Desktop {
@@ -170,14 +166,6 @@ impl Desktop {
                 }
             });
         });
-        ui.label(
-            RichText::new(self.text(
-                "打字时，角色随你的节奏轻轻动一动。",
-                "Your companion moves gently as you type.",
-            ))
-            .size(12.0)
-            .color(palette.muted),
-        );
         ui.add_space(4.0);
         ui.label(self.text("角色", "Character"));
         let mut character = self.character;
@@ -203,10 +191,6 @@ impl Desktop {
                 Err(error) => self.character_error = Some(error),
             }
         }
-        palette.note(
-            ui,
-            self.text("身体与双手独立动作。", "Body and hands move independently."),
-        );
         if let Some(error) = &self.character_error {
             ui.colored_label(palette.error, error);
         }
@@ -223,6 +207,12 @@ impl Desktop {
                 ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
             }
         });
+        if !self.docking.available() {
+            ui.colored_label(
+                palette.error,
+                self.text("窗口吸附暂不可用", "Window snapping unavailable"),
+            );
+        }
         ui.horizontal(|ui| {
             ui.label(self.text("角色大小", "Character size"));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -284,7 +274,6 @@ impl Desktop {
             ui.ctx()
                 .send_viewport_cmd_to(egui::ViewportId::ROOT, ViewportCommand::Close);
         }
-        palette.note(ui, self.docking.status(self.chinese_font));
         ui.add_space(4.0);
         egui::CollapsingHeader::new(self.text("桌面选项", "Desktop options"))
             .default_open(false)

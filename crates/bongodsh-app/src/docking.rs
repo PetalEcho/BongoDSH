@@ -84,17 +84,6 @@ impl Docking {
         self.set_enabled(self.available());
     }
 
-    pub fn status(&self, chinese: bool) -> &'static str {
-        match (self.placement.attached(), self.enabled, chinese) {
-            (true, _, true) => "已吸附窗口，拖动可解除。",
-            (true, _, false) => "Attached to a window. Drag to detach.",
-            (false, true, true) => "拖近其他窗口边缘后松开即可吸附。",
-            (false, true, false) => "Drop near another window edge to attach.",
-            (false, false, true) => "自由放置，可拖动角色调整位置。",
-            (false, false, false) => "Drag the companion to place it freely.",
-        }
-    }
-
     pub fn panel_geometry(&self, desired: Vec2) -> Option<(Pos2, Vec2)> {
         let (widget, monitors) = self.native.as_ref()?.geometry(Rect::ZERO)?;
         let monitor = monitors.iter().min_by(|a, b| {

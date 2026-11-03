@@ -1,6 +1,6 @@
 {
   "name": "dsh-bongodsh",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "BongoDSH 大肥鱼打字挂件，六个彩色角色直接显示在 DSH 页面内。",
   "private": true,
   "license": "UNLICENSED",
@@ -39,6 +39,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepare:native": "node scripts/package-native.mjs",
+    "release": "node scripts/release.mjs",
     "check": "node --check index.js && node --check desktop-host.js && node --check src/desktop-bridge.js && node --check client.js && node scripts/build.mjs --check",
     "preview": "node scripts/preview.mjs",
     "prepack": "npm run check"

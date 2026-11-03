@@ -261,10 +261,8 @@ window.__ModuleLoader__.load({
   panel.setAttribute('aria-label', 'BongoDSH 设置');
   panel.innerHTML = `
     <div class="heading"><strong>BongoDSH</strong><button class="close" type="button" aria-label="关闭设置">×</button></div>
-    <p>打字时，角色随你的节奏轻轻动一动。</p>
     <label class="row" for="bongo-character">角色</label>
     <select id="bongo-character" name="character"></select>
-    <p class="note character-note"></p>
     <label class="row">暂停动作<input name="paused" type="checkbox"></label>
     <label class="row">跟随输入框<input name="docked" type="checkbox"></label>
     <label class="row" for="bongo-size">角色大小<output for="bongo-size"></output></label>
@@ -275,13 +273,11 @@ window.__ModuleLoader__.load({
     <input id="bongo-body-amplitude" name="bodyAmplitude" type="range" min="0" max="200" step="10">
     <div class="actions"><button type="button" class="action reset">恢复位置</button></div>
     <button type="button" class="action desktop">移到桌面</button>
-    <p class="note desktop-status" role="status">拖出窗口可移到桌面，并吸附其他程序窗口。</p>
-    <p class="note anchor-status"></p>
-    <p class="note">仅响应当前页面的物理按键，不保存输入内容。</p>
-    <p class="note notice" role="status" hidden>设置暂时无法保存，当前页面仍可使用。</p>`;
+    <p class="note desktop-status" role="status" hidden></p>
+    <p class="note anchor-status" hidden>未找到输入框，暂靠页面边缘。</p>
+    <p class="note notice" role="status" hidden>设置未保存，当前页面仍可使用。</p>`;
   shadow.append(pet, hint, panel);
   const characterInput = panel.querySelector('[name=character]');
-  const characterNote = panel.querySelector('.character-note');
   for (const character of characters) {
     const option = document.createElement('option');
     option.value = character.id;
@@ -355,6 +351,11 @@ window.__ModuleLoader__.load({
     else { syncSettings(); schedulePlace(); }
   }
 
+  function setDesktopStatus(message = '') {
+    desktopStatus.textContent = message;
+    desktopStatus.hidden = !message;
+  }
+
   async function checkDesktop() {
     win.clearTimeout(desktopTimer);
     desktopTimer = 0;
@@ -370,12 +371,10 @@ window.__ModuleLoader__.load({
       syncDesktopSettings(status, current);
       if (current) setDetached(status.active === true);
       else if (!detachPending) desktopCheckQueued = true;
-      desktopStatus.textContent = status.available
-        ? '拖出窗口后，靠近其他程序的窗口边缘松手即可吸附。'
-        : '尚未安装桌面组件，请按插件说明完成桌面设置。';
+      setDesktopStatus(status.available ? '' : '未安装桌面组件，请按插件说明设置。');
     } catch {
       if (!disposed) {
-        desktopStatus.textContent = '拖出功能需要本机 DSH 和已构建的桌面挂件。';
+        setDesktopStatus('桌面连接不可用，请检查本机 DSH 和桌面组件。');
       }
     } finally { checkingDesktop = false; }
     if (!disposed && !document.hidden && !detachPending && (desktopCheckQueued || detached)) {
@@ -387,7 +386,7 @@ window.__ModuleLoader__.load({
   async function detachToDesktop(grabX = 0.5, grabY = 0.5) {
     if (detachPending || detached || disposed) return;
     if (!desktopBridge) {
-      desktopStatus.textContent = '请在本机 DSH 中使用拖出功能。';
+      setDesktopStatus('请在本机 DSH 中移到桌面。');
       openPanel();
       return;
     }
@@ -395,7 +394,7 @@ window.__ModuleLoader__.load({
     const version = ++desktopVersion;
     let stale = false;
     desktopButton.disabled = true;
-    desktopStatus.textContent = '正在移到桌面…';
+    setDesktopStatus('正在移到桌面…');
     resetInput();
     try {
       const status = await desktopBridge.detach(settings.character, settings.size, grabX, grabY,
@@ -410,8 +409,8 @@ window.__ModuleLoader__.load({
       endDrag(true);
       stale = version !== desktopVersion;
       if (!stale) {
-        desktopStatus.textContent = error.message;
-        if (!document.hidden) openPanel();
+        setDesktopStatus(error.message || '移到桌面失败，请重试。');
+        if (!document.hidden) openPanel(false);
       }
     } finally {
       detachPending = false;
@@ -443,16 +442,17 @@ window.__ModuleLoader__.load({
     if (artwork.svg.dataset.character !== settings.character) {
       const character = artwork.select(settings.character);
       pet.setAttribute('aria-label', `BongoDSH ${character.label}，点击设置或拖动位置`);
-      characterNote.textContent = character.leftHand || character.rightHand
-        ? '身体与双手独立动作。' : '随按键轻轻压下身体。';
     }
     characterInput.value = settings.character;
     pauseInput.checked = settings.paused;
     dockInput.checked = settings.docked;
     sizeInput.value = String(settings.size);
+    sizeInput.style.setProperty('--range-progress', `${(settings.size - 100) / 120 * 100}%`);
     output.textContent = `${settings.size} px`;
     handAmplitudeInput.value = String(settings.handAmplitude);
     bodyAmplitudeInput.value = String(settings.bodyAmplitude);
+    handAmplitudeInput.style.setProperty('--range-progress', `${settings.handAmplitude / 2}%`);
+    bodyAmplitudeInput.style.setProperty('--range-progress', `${settings.bodyAmplitude / 2}%`);
     handAmplitudeOutput.textContent = `${settings.handAmplitude}%`;
     bodyAmplitudeOutput.textContent = `${settings.bodyAmplitude}%`;
     pet.dataset.paused = String(settings.paused);
@@ -512,9 +512,7 @@ window.__ModuleLoader__.load({
     host.style.width = `${box.width}px`;
     host.style.height = `${box.height}px`;
     host.style.transform = `translate(${box.x}px, ${box.y}px)`;
-    anchorStatus.textContent = settings.docked
-      ? (rect ? '已跟随输入框上沿。' : '未找到可见输入框，暂时停靠页面边缘。')
-      : '自由放置，可拖动角色调整位置。';
+    anchorStatus.hidden = !settings.docked || !!rect;
     positionPanel();
   }
 
@@ -560,14 +558,14 @@ window.__ModuleLoader__.load({
     restoreFocus = null;
   }
 
-  function openPanel() {
+  function openPanel(refreshDesktop = true) {
     resetInput();
     restoreFocus = document.activeElement === host ? pet : document.activeElement;
     panel.hidden = false;
     pet.setAttribute('aria-expanded', 'true');
     positionPanel();
     closeButton.focus({ preventScroll: true });
-    void checkDesktop();
+    if (refreshDesktop) void checkDesktop();
   }
 
   function ownEvent(event) { return event.composedPath().includes(host); }
@@ -788,7 +786,7 @@ window.__ModuleLoader__.load({
     dispose() { lifetime.abort(); injection?.dispose?.(); },
   };
 };
-    const styles = "\n  :host { all: initial; position: fixed; left: 0; top: 0; z-index: 40; pointer-events: none;\n    font: 13px/1.5 -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", sans-serif; color: #2a4352; }\n  *, *::before, *::after { box-sizing: border-box; }\n  [hidden], :host([hidden]) { display: none !important; }\n  button, input, select { font: inherit; }\n  button { cursor: pointer; color: inherit; }\n  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #27768b; outline-offset: 3px; }\n  .pet { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent;\n    pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; border-radius: 45%; }\n  .pet:active { cursor: grabbing; }\n  .pet svg { width: 100%; height: 100%; display: block; overflow: visible; pointer-events: none; }\n  .pet[data-paused=\"true\"] { opacity: .62; }\n  .hint { position: absolute; right: 0; bottom: -22px; white-space: nowrap; background: #ebf8f6;\n    border: 1px solid #c7dfe3; border-radius: 6px; padding: 1px 6px; font-size: 11px;\n    opacity: 0; transition: opacity .12s; }\n  .pet:focus-visible + .hint { opacity: 1; }\n  .panel { position: absolute; width: 248px; max-width: calc(100vw - 16px); padding: 14px;\n    background: #f5fbfc; color: #2a4352; border: 1px solid #b7d4db; border-radius: 12px;\n    box-shadow: 0 5px 24px #1b455a26; pointer-events: auto; overflow-y: auto; }\n  .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }\n  .heading strong { font-size: 15px; font-weight: 650; }\n  .close { border: 0; background: transparent; padding: 2px 6px; font-size: 19px; line-height: 1; }\n  p { margin: 0 0 10px; font-size: 12px; color: #536b77; }\n  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; }\n  .row input[type=checkbox] { width: 16px; height: 16px; accent-color: #27768b; }\n  select { width: 100%; padding: 6px 8px; border: 1px solid #bad5dc; border-radius: 7px;\n    background: #fff; color: inherit; }\n  .character-note { margin: 6px 0; }\n  input[type=range] { display: block; width: 100%; margin: 6px 0 14px; accent-color: #27768b; }\n  output { font-variant-numeric: tabular-nums; color: #536b77; }\n  .actions { display: flex; gap: 8px; margin: 10px 0; }\n  .action { flex: 1; background: #e3f1f4; border: 1px solid #bad5dc; border-radius: 7px; padding: 6px 8px; }\n  .desktop { width: 100%; }\n  button:disabled { cursor: wait; opacity: .6; }\n  .note { margin: 10px 0 0; font-size: 11px; color: #536b77; }\n  .notice { color: #9b492b; }\n  @media (prefers-color-scheme: dark) {\n    .panel { background: #243b46; color: #e4f3f6; border-color: #537581; }\n    p, output, .note { color: #b6ccd5; }\n    .action { background: #345360; border-color: #5a7b88; color: #e4f3f6; }\n    select { background: #345360; border-color: #5a7b88; }\n    .notice { color: #f5bea0; }\n  }\n  @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }\n";
+    const styles = "\n  :host { all: initial; position: fixed; left: 0; top: 0; z-index: 40; pointer-events: none;\n    font: 13px/1.5 -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", sans-serif; color: #2a4352; }\n  *, *::before, *::after { box-sizing: border-box; }\n  [hidden], :host([hidden]) { display: none !important; }\n  button, input, select { font: inherit; }\n  button { cursor: pointer; color: inherit; }\n  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #27768b; outline-offset: 3px; }\n  .pet { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent;\n    pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; border-radius: 45%; }\n  .pet:active { cursor: grabbing; }\n  .pet svg { width: 100%; height: 100%; display: block; overflow: visible; pointer-events: none; }\n  .pet[data-paused=\"true\"] { opacity: .62; }\n  .hint { position: absolute; right: 0; bottom: -22px; white-space: nowrap; background: #ebf8f6;\n    border: 1px solid #c7dfe3; border-radius: 6px; padding: 1px 6px; font-size: 11px;\n    opacity: 0; transition: opacity .12s; }\n  .pet:focus-visible + .hint { opacity: 1; }\n  .panel { position: absolute; width: 248px; max-width: calc(100vw - 16px); padding: 14px;\n    background: #f5fbfc; color: #2a4352; border: 1px solid #b7d4db; border-radius: 12px;\n    box-shadow: 0 5px 24px #1b455a26; pointer-events: auto; overflow-y: auto; }\n  .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }\n  .heading strong { font-size: 15px; font-weight: 650; }\n  .close { border: 0; background: transparent; padding: 2px 6px; font-size: 19px; line-height: 1; }\n  p { margin: 0 0 10px; font-size: 12px; color: #536b77; }\n  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; }\n  .row input[type=checkbox] { width: 16px; height: 16px; accent-color: #27768b; }\n  select { width: 100%; padding: 6px 8px; border: 1px solid #bad5dc; border-radius: 7px;\n    background: #fff; color: inherit; }\n  input[type=range] { --range-fill: #27768b; --range-track: #c7dfe3; --range-thumb: #f5fbfc;\n    appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 24px;\n    margin: 0 0 6px; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }\n  input[type=range]:focus-visible { outline-color: var(--range-fill); outline-offset: 2px; }\n  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;\n    background: linear-gradient(to right, var(--range-fill) var(--range-progress, 50%), var(--range-track) var(--range-progress, 50%)); }\n  input[type=range]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; box-sizing: border-box;\n    width: 14px; height: 14px; margin-top: -5px; border: 2px solid var(--range-fill); border-radius: 50%; background: var(--range-thumb); }\n  input[type=range]::-moz-range-track { height: 4px; border: 0; border-radius: 2px; background: var(--range-track); }\n  input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--range-fill); }\n  input[type=range]::-moz-range-thumb { box-sizing: border-box; width: 14px; height: 14px;\n    border: 2px solid var(--range-fill); border-radius: 50%; background: var(--range-thumb); }\n  output { font-variant-numeric: tabular-nums; color: #536b77; }\n  .actions { display: flex; gap: 8px; margin: 10px 0; }\n  .action { flex: 1; background: #e3f1f4; border: 1px solid #bad5dc; border-radius: 7px; padding: 6px 8px; }\n  .desktop { width: 100%; }\n  button:disabled { cursor: wait; opacity: .6; }\n  .note { margin: 10px 0 0; font-size: 11px; color: #536b77; }\n  .notice { color: #9b492b; }\n  @media (prefers-color-scheme: dark) {\n    .panel { background: #243b46; color: #e4f3f6; border-color: #537581; }\n    p, output, .note { color: #b6ccd5; }\n    .action { background: #345360; border-color: #5a7b88; color: #e4f3f6; }\n    select { background: #345360; border-color: #5a7b88; }\n    input[type=range] { --range-fill: #9acbd7; --range-track: #537581; --range-thumb: #243b46; }\n    .notice { color: #f5bea0; }\n  }\n  @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }\n";
     return {
       name: 'dsh-bongodsh',
       apply(ctx) {
