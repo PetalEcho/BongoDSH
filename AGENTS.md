@@ -4,7 +4,7 @@
 
 - BongoDSH 是使用 Rust 实现的独立桌面打字挂件，目标平台为 macOS 和 Windows。
 - DSH 指参考仓库所使用的 DeepSeek Harness。`plugins/dsh-bongodsh/` 提供页面角色和拖出桌面的宿主桥接；原生输入框定位与任务事件尚未接入。协议与验证边界见 `docs/desktop-bridge.md`。
-- 项目基调、分期和平台边界见 `docs/project-baseline.md`。当前已有 egui/eframe 桌面原型与 macOS / Windows 全局键盘适配，默认窗口输入，用户主动开启全局模式。权限与验证边界见 `docs/global-keyboard.md`；页面插件的安装和兼容边界见 `plugins/dsh-bongodsh/README.md`。
+- 项目基调、分期和平台边界见 `docs/project-baseline.md`。当前已有 egui/eframe 桌面原型与 macOS / Windows 全局键盘适配，首次默认窗口输入，用户主动选择的输入模式保存在本机，重启或重新拖出后恢复；恢复全局模式不自动申请系统权限。权限与验证边界见 `docs/global-keyboard.md`；页面插件的安装和兼容边界见 `plugins/dsh-bongodsh/README.md`。
 - 角色小巧、低干扰，主要操作通过右键或托盘进入。设置面板优先展示预览和常用设置，不使用超大标题或口号式 Hero。
 - 用户明确要求角色不配键盘图形。身体与双手保持独立图层，双手叠放在身体前侧，不在身体下方单独留一排空间。
 

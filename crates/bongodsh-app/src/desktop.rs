@@ -13,18 +13,12 @@ use crate::{
     docking::Docking,
     global_input::{GlobalInput, Status},
     input,
+    preferences::{self, InputSource},
     sprites::Artwork,
 };
 
 mod controls;
 mod settings;
-
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
-enum InputSource {
-    #[default]
-    Window,
-    Global,
-}
 
 pub(crate) fn run(launch: Option<Launch>) -> eframe::Result {
     let size = launch.map_or([300.0, 270.0], |launch| {
@@ -79,6 +73,8 @@ struct Desktop {
     desktop_settings_size: egui::Vec2,
     character_error: Option<String>,
     settings_error: Option<String>,
+    preferences_path: Option<std::path::PathBuf>,
+    preferences_error: Option<String>,
 }
 
 impl Desktop {
@@ -98,6 +94,23 @@ impl Desktop {
         let parent = launch
             .map(|_| detached::watch_parent(ctx.clone()))
             .transpose()?;
+        let (preferences_path, source, preferences_error) = match preferences::path() {
+            Ok(path) => {
+                let (source, error) = match preferences::load(&path) {
+                    Ok(source) => (source, None),
+                    Err(error) => (
+                        InputSource::Window,
+                        Some(format!("键盘输入偏好读取失败，已使用窗口输入：{error}。")),
+                    ),
+                };
+                (Some(path), source, error)
+            }
+            Err(error) => (
+                None,
+                InputSource::Window,
+                Some(format!("键盘输入偏好读取失败，已使用窗口输入：{error}。")),
+            ),
+        };
         if launch.is_some() {
             ctx.set_theme(egui::ThemePreference::System);
         } else {
@@ -109,7 +122,7 @@ impl Desktop {
                 style.spacing.button_padding = vec2(10.0, 7.0);
             });
         }
-        Ok(Self {
+        let mut app = Self {
             artwork,
             docking,
             parent,
@@ -127,7 +140,7 @@ impl Desktop {
             focused: false,
             always_on_top: true,
             chinese_font: install_system_font(ctx),
-            source: InputSource::Window,
+            source,
             global: GlobalInput::default(),
             keyboard_settings_open: false,
             desktop_settings_open: false,
@@ -135,7 +148,11 @@ impl Desktop {
             desktop_settings_size: vec2(264.0, 410.0),
             character_error: None,
             settings_error: None,
-        })
+            preferences_path,
+            preferences_error,
+        };
+        app.restart_input(ctx);
+        Ok(app)
     }
 
     fn text(&self, chinese: &'static str, english: &'static str) -> &'static str {
@@ -158,13 +175,26 @@ impl Desktop {
     fn restart_input(&mut self, ctx: &egui::Context) {
         self.global.stop();
         self.reset();
-        if self.source == InputSource::Global && !self.paused {
+        if self.source.should_listen_globally(self.paused) {
             self.global.start(ctx);
         }
     }
 
     fn switch_source(&mut self, source: InputSource, ctx: &egui::Context) {
+        if source == self.source {
+            self.restart_input(ctx);
+            return;
+        }
         self.source = source;
+        self.preferences_error = match &self.preferences_path {
+            Some(path) => preferences::save(path, source).err().map(|error| {
+                format!("键盘输入偏好保存失败，本次选择仍生效，重启后可能恢复旧设置：{error}。")
+            }),
+            None => Some(
+                "键盘输入偏好保存失败，无法确定本机设置目录；本次选择仅在当前运行中有效。"
+                    .to_owned(),
+            ),
+        };
         self.restart_input(ctx);
     }
 
@@ -198,6 +228,9 @@ impl Desktop {
 
     fn keyboard_panel(&mut self, ui: &mut egui::Ui) {
         ui.label(self.status_text());
+        if let Some(error) = &self.preferences_error {
+            ui.colored_label(Color32::from_rgb(160, 76, 60), error);
+        }
         ui.separator();
         let mut source = self.source;
         ui.radio_value(
@@ -216,6 +249,10 @@ impl Desktop {
         if source != self.source {
             self.switch_source(source, ui.ctx());
         }
+        ui.small(self.text(
+            "输入模式会保存在本机，重启后自动恢复。",
+            "Input mode is saved on this computer and restored after restart.",
+        ));
         ui.add_space(8.0);
         ui.label(self.text("只处理物理按键的按下和松开，不读取、保存或上传输入文字。", "Only physical key presses and releases are processed. Typed text is never read, stored or uploaded."));
         if self.paused {
