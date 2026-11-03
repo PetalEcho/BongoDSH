@@ -1,0 +1,140 @@
+name: Package desktop platforms
+run-name: Package desktop platforms from ${{ inputs.ref || 'v0.2.4' }}
+
+on:
+  push:
+    branches: [PetalEcho/companion-quality-docking]
+    paths: [.github/workflows/package-platforms.yml]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Existing tag or commit to package
+        required: true
+        default: v0.2.4
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            platform: win32-x64
+            target: x86_64-pc-windows-msvc
+          - runner: macos-15-intel
+            platform: darwin-x64
+            target: x86_64-apple-darwin
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_REF: ${{ inputs.ref || 'v0.2.4' }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        id: source
+        with:
+          ref: ${{ env.BUILD_REF }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          architecture: x64
+          package-manager-cache: false
+      - name: Verify source and build host
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          EXPECTED_PLATFORM: ${{ matrix.platform }}
+          EXPECTED_TARGET: ${{ matrix.target }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+
+          if (['v0.2.4', 'refs/tags/v0.2.4'].includes(process.env.BUILD_REF)) {
+            assert.equal(process.env.SOURCE_COMMIT, 'd7a0afed60a56506e200251789f616530437faaf');
+          }
+          assert.equal(`${process.platform}-${process.arch}`, process.env.EXPECTED_PLATFORM);
+          const [major, minor] = process.versions.node.split('.').map(Number);
+          assert.ok(major > 22 || (major === 22 && minor >= 19), 'Node 22.19+ is required');
+          const rust = spawnSync('rustc', ['-vV'], { encoding: 'utf8', shell: false });
+          assert.equal(rust.status, 0, rust.error?.message || rust.stderr);
+          assert.equal(rust.stdout.match(/^host: (.+)$/m)?.[1]?.trim(), process.env.EXPECTED_TARGET);
+          console.log(`Source: ${process.env.BUILD_REF} (${process.env.SOURCE_COMMIT})`);
+          console.log(`Host: ${process.env.EXPECTED_PLATFORM}; Rust: ${process.env.EXPECTED_TARGET}`);
+          NODE
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Test available targets
+        run: cargo test --workspace --all-features --locked
+      - name: Build desktop package
+        working-directory: plugins/dsh-bongodsh
+        run: npm run release
+      - name: Simulated input demo
+        run: cargo run --release --locked --bin bongodsh -- --demo
+      - name: Verify binary version and prepare platform checksum
+        id: artifact
+        working-directory: plugins/dsh-bongodsh
+        env:
+          EXPECTED_PLATFORM: ${{ matrix.platform }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+          import { resolve } from 'node:path';
+
+          const { name, version } = JSON.parse(readFileSync('package.json', 'utf8'));
+          assert.equal(name, 'dsh-bongodsh');
+          assert.match(version, /^\d+\.\d+\.\d+$/);
+          if (['v0.2.4', 'refs/tags/v0.2.4'].includes(process.env.BUILD_REF)) {
+            assert.equal(version, '0.2.4');
+          }
+          const platform = process.env.EXPECTED_PLATFORM;
+          const executable = platform === 'win32-x64'
+            ? 'bongodsh.exe'
+            : 'BongoDSH Companion.app/Contents/MacOS/bongodsh';
+          const binary = resolve('native', platform, executable);
+          const help = spawnSync(binary, ['--help'], {
+            encoding: 'utf8', shell: false, windowsHide: true,
+          });
+          assert.equal(help.status, 0, help.error?.message || help.stderr);
+          assert.equal(help.stdout.split(/\r?\n/, 1)[0], `BongoDSH ${version}`);
+          const artifact = `${name}-${version}-${platform}`;
+          const archive = `${artifact}.tgz`;
+          const checksum = `${archive}.sha256`;
+          const hash = createHash('sha256').update(readFileSync(resolve('dist', archive))).digest('hex');
+          const entry = `${hash}  ${archive}`;
+          assert.ok(readFileSync('dist/SHA256SUMS.txt', 'utf8').split(/\r?\n/).includes(entry));
+          writeFileSync(resolve('dist', checksum), `${entry}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, [
+            `name=${artifact}`,
+            `archive=plugins/dsh-bongodsh/dist/${archive}`,
+            `checksum=plugins/dsh-bongodsh/dist/${checksum}`,
+            '',
+          ].join('\n'));
+          console.log(`Verified BongoDSH ${version}: ${entry}`);
+          NODE
+      - name: Upload platform package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: |
+            ${{ steps.artifact.outputs.archive }}
+            ${{ steps.artifact.outputs.checksum }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
