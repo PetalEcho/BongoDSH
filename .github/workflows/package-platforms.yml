@@ -1,5 +1,5 @@
 name: Package desktop platforms
-run-name: Package desktop platforms from ${{ inputs.ref || 'v0.2.4' }}
+run-name: Package desktop platforms from ${{ inputs.ref || github.sha }}
 
 on:
   push:
@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Existing tag or commit to package
-        required: true
-        default: v0.2.4
+        description: Tag, branch or commit to package (blank uses this workflow run's commit)
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
         shell: bash
     env:
       CARGO_TERM_COLOR: always
-      BUILD_REF: ${{ inputs.ref || 'v0.2.4' }}
+      BUILD_REF: ${{ inputs.ref || github.sha }}
     steps:
       - uses: actions/checkout@v7.0.1
         id: source
@@ -45,7 +45,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: '1.93.1'
+          toolchain: '1.99.1'
           components: rustfmt, clippy
       - uses: actions/setup-node@v6
         with:
@@ -62,14 +62,12 @@ jobs:
           import assert from 'node:assert/strict';
           import { spawnSync } from 'node:child_process';
 
-          if (['v0.2.4', 'refs/tags/v0.2.4'].includes(process.env.BUILD_REF)) {
-            assert.equal(process.env.SOURCE_COMMIT, 'd7a0afed60a56506e200251789f616530437faaf');
-          }
           assert.equal(`${process.platform}-${process.arch}`, process.env.EXPECTED_PLATFORM);
           const [major, minor] = process.versions.node.split('.').map(Number);
           assert.ok(major > 22 || (major === 22 && minor >= 19), 'Node 22.19+ is required');
           const rust = spawnSync('rustc', ['-vV'], { encoding: 'utf8', shell: false });
           assert.equal(rust.status, 0, rust.error?.message || rust.stderr);
+          assert.equal(rust.stdout.match(/^release: (.+)$/m)?.[1]?.trim(), '1.99.1');
           assert.equal(rust.stdout.match(/^host: (.+)$/m)?.[1]?.trim(), process.env.EXPECTED_TARGET);
           console.log(`Source: ${process.env.BUILD_REF} (${process.env.SOURCE_COMMIT})`);
           console.log(`Host: ${process.env.EXPECTED_PLATFORM}; Rust: ${process.env.EXPECTED_TARGET}`);
@@ -101,9 +99,6 @@ jobs:
           const { name, version } = JSON.parse(readFileSync('package.json', 'utf8'));
           assert.equal(name, 'dsh-bongodsh');
           assert.match(version, /^\d+\.\d+\.\d+$/);
-          if (['v0.2.4', 'refs/tags/v0.2.4'].includes(process.env.BUILD_REF)) {
-            assert.equal(version, '0.2.4');
-          }
           const platform = process.env.EXPECTED_PLATFORM;
           const executable = platform === 'win32-x64'
             ? 'bongodsh.exe'

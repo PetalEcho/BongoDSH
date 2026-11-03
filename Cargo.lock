@@ -124,7 +124,7 @@ dependencies = [
 
 [[package]]
 name = "bongodsh-app"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "bongodsh-core",
  "core-foundation",
@@ -142,7 +142,7 @@ dependencies = [
 
 [[package]]
 name = "bongodsh-core"
-version = "0.2.4"
+version = "0.2.5"
 
 [[package]]
 name = "bumpalo"

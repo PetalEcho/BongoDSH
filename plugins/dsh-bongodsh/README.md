@@ -1,26 +1,30 @@
 # BongoDSH DSH 插件
 
-六款彩色打字角色，可贴在 DSH 输入框上沿，也可拖出为桌面挂件。当前版本 0.2.4。
+六款彩色打字角色，可贴在 DSH 输入框上沿，也可拖出为桌面挂件。当前版本 0.2.5。
 
 ## 安装
 
-从 [GitHub Release](https://github.com/PetalEcho/BongoDSH/releases/tag/v0.2.4) 下载：
+需要 DSH `>=0.2.1-rc.5`，实际验证版本为 `0.2.1-rc.5`。在「插件 → 添加插件」粘贴对应平台的 GitHub Release 链接，安装后启用。macOS Apple Silicon 使用：
 
-| 文件 | 内容 |
-| --- | --- |
-| `dsh-bongodsh-0.2.4-darwin-arm64.tgz` | macOS Apple Silicon 完整包，含页面、桌面程序和全部素材 |
-| `dsh-bongodsh-0.2.4-web.tgz` | 通用页面包，含全部素材，不含桌面程序 |
-| `SHA256SUMS.txt` | 安装包校验值 |
-
-需要 DSH `>=0.2.1-rc.5`，实际验证版本为 `0.2.1-rc.5`。在「插件 → 添加插件」填写安装包的绝对路径，安装后启用。命令行安装：
-
-```sh
-dsh plugin --profile web add /absolute/path/dsh-bongodsh-0.2.4-darwin-arm64.tgz
+```text
+https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-arm64.tgz
 ```
 
-使用页面包时替换文件名；profile 按 DSH 实例调整。安装或升级后重启 DSH 并刷新页面。禁用或移除插件会清理页面角色和监听，用户设置保留。
+| 平台 | Release 安装链接 |
+| --- | --- |
+| macOS Apple Silicon | [dsh-bongodsh-0.2.5-darwin-arm64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-arm64.tgz) |
+| macOS Intel | [dsh-bongodsh-0.2.5-darwin-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-x64.tgz) |
+| Windows x64 | [dsh-bongodsh-0.2.5-win32-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-win32-x64.tgz) |
 
-当前 Release 不包含 Windows 或 Intel Mac 桌面程序。macOS 完整包未经过 Developer ID 签名和公证。页面模式不需要 Rust 或系统键盘权限。
+0.2.5 各平台附件待构建、检查并上传后可用。命令行也可直接添加链接：
+
+```sh
+dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-arm64.tgz
+```
+
+其他平台替换为表中对应链接；profile 按 DSH 实例调整。安装或升级后重启 DSH 并刷新页面。禁用或移除插件会清理页面角色和监听，用户设置保留。
+
+完整包包含页面、桌面程序和全部角色素材，无需安装 Rust。macOS 完整包未经过 Developer ID 签名和公证。Intel Mac 和 Windows x64 尚未 GUI 实测，构建与 CLI 检查结果待本次 CI 完成后补齐。页面模式不需要系统键盘权限。
 
 ## 设置与操作
 
@@ -45,7 +49,7 @@ dsh plugin --profile web add /absolute/path/dsh-bongodsh-0.2.4-darwin-arm64.tgz
 
 窗口失焦、暂停或监听中断时清空按住状态。DSH 退出或禁用插件会回收它启动的桌面进程；刷新页面可重新连接已启动的角色。独立运行的桌面原型不依赖 DSH。
 
-页面定位依赖 DSH 的输入框标记；桌面吸附只读取窗口几何，不定位其他程序的输入框。当前没有声音、任务提醒、自定义素材、托盘或点击穿透。协议见 [桌面桥接](https://github.com/PetalEcho/BongoDSH/blob/v0.2.4/docs/desktop-bridge.md)，权限说明见 [全局键盘](https://github.com/PetalEcho/BongoDSH/blob/v0.2.4/docs/global-keyboard.md)。
+页面定位依赖 DSH 的输入框标记；桌面吸附只读取窗口几何，不定位其他程序的输入框。当前没有声音、任务提醒、自定义素材、托盘或点击穿透。协议见 [桌面桥接](https://github.com/PetalEcho/BongoDSH/blob/v0.2.5/docs/desktop-bridge.md)，权限说明见 [全局键盘](https://github.com/PetalEcho/BongoDSH/blob/v0.2.5/docs/global-keyboard.md)。
 
 ## 从源码运行
 
@@ -55,7 +59,7 @@ dsh plugin --profile web add /absolute/path/dsh-bongodsh-0.2.4-darwin-arm64.tgz
 dsh plugin --profile web add ./plugins/dsh-bongodsh
 ```
 
-本地目录安装需要保留原目录。桌面功能需要 Rust stable 1.93+；macOS 使用 Xcode Command Line Tools，Windows 使用 MSVC 工具链。从仓库根目录运行 `cargo build --workspace --release --locked`，宿主会查找 `target/release/bongodsh` 或 `bongodsh.exe`。
+本地目录安装需要保留原目录。开发和发布统一使用 Rust 1.99.1；macOS 使用 Xcode Command Line Tools，Windows 使用 MSVC 工具链。从仓库根目录运行 `cargo build --workspace --release --locked`，宿主会查找 `target/release/bongodsh` 或 `bongodsh.exe`。
 
 ```sh
 cd plugins/dsh-bongodsh
@@ -79,7 +83,7 @@ npm run release
 
 如只需刷新本机桌面组件，使用 `npm run prepare:native`。它只更新当前平台的 `native/`。修改素材后必须重新生成客户端并重建原生程序。
 
-本地回归放在被忽略的 `tests/`，存在时可运行 `node --test tests/*.test.mjs`。CI 校验语法、生成产物与包清单，不包含未提交的回归用例。实际平台和历史检查见 [验证记录](https://github.com/PetalEcho/BongoDSH/blob/v0.2.4/docs/plugin-validation.md)。
+本地回归放在被忽略的 `tests/`，存在时可运行 `node --test tests/*.test.mjs`。CI 校验语法、生成产物与包清单，不包含未提交的回归用例。实际平台和历史检查见 [验证记录](https://github.com/PetalEcho/BongoDSH/blob/v0.2.5/docs/plugin-validation.md)。
 
 ## 素材
 

@@ -19,8 +19,9 @@ jobs:
         os: [macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: '1.99.1'
           components: rustfmt, clippy
       - name: Format
         run: cargo fmt --all -- --check

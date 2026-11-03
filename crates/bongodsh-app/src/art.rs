@@ -80,7 +80,7 @@ pub(crate) fn draw(painter: &Painter, bounds: Rect, hands: HandPositions) {
             ],
             false,
             Color32::TRANSPARENT,
-            Stroke::new(2.4, INK),
+            Stroke::new(2.4_f32, INK),
         ),
     ));
 
@@ -131,7 +131,7 @@ fn draw_hand(painter: &Painter, center: Pos2, progress: f32, angle: f32) {
                 hand + vec2(x, 8.0 - press * 3.0),
                 hand + vec2(x, 13.0 - press * 4.0),
             ],
-            Stroke::new(1.6, SHADE),
+            Stroke::new(1.6_f32, SHADE),
         );
     }
 }
@@ -166,7 +166,7 @@ pub(crate) fn close_icon(painter: &Painter, bounds: Rect) {
                 bounds.center() + vec2(-4.0, sign * -4.0),
                 bounds.center() + vec2(4.0, sign * 4.0),
             ],
-            Stroke::new(1.5, INK),
+            Stroke::new(1.5_f32, INK),
         );
     }
 }

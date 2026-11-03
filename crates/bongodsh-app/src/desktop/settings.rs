@@ -64,7 +64,7 @@ impl Palette {
         style.visuals.panel_fill = self.background;
         style.visuals.extreme_bg_color = self.control;
         style.visuals.selection.bg_fill = self.accent;
-        style.visuals.selection.stroke = Stroke::new(1.0, self.text);
+        style.visuals.selection.stroke = Stroke::new(1.0_f32, self.text);
         for widget in [
             &mut style.visuals.widgets.inactive,
             &mut style.visuals.widgets.hovered,
@@ -73,12 +73,12 @@ impl Palette {
         ] {
             widget.bg_fill = self.control;
             widget.weak_bg_fill = self.control;
-            widget.bg_stroke = Stroke::new(1.0, self.border);
-            widget.fg_stroke = Stroke::new(1.0, self.text);
+            widget.bg_stroke = Stroke::new(1.0_f32, self.border);
+            widget.fg_stroke = Stroke::new(1.0_f32, self.text);
             widget.corner_radius = 7.into();
         }
-        style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, self.accent);
-        style.visuals.widgets.active.bg_stroke = Stroke::new(1.5, self.accent);
+        style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, self.accent);
+        style.visuals.widgets.active.bg_stroke = Stroke::new(1.5_f32, self.accent);
     }
 }
 
@@ -125,7 +125,7 @@ impl Desktop {
                 ui.set_max_size(max_size);
                 let response = egui::Frame::new()
                     .fill(palette.background)
-                    .stroke(Stroke::new(1.0, palette.border))
+                    .stroke(Stroke::new(1.0_f32, palette.border))
                     .corner_radius(12)
                     .inner_margin(14.0)
                     .show(ui, |ui| {
