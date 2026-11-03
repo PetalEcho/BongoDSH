@@ -2,10 +2,6 @@
 
 一个陪你打字的小挂件。敲键时双手拍下、身体轻轻回弹；可以贴在 DSH 输入框上沿，也可以拖到桌面，吸附在其他程序的窗口边缘。
 
-当前源码的桌面版和插件版共用以下五款角色。水手鱼、睡衣鱼和魔法师鱼已按基础大肥鱼重绘，统一为长发、闭眼微笑和低趴造型。点击预览可查看当前身体原图；双手在运行时独立叠加，不带键盘图形。
-
-这些角色调整尚未发布，下面的 0.2.5 安装包仍使用旧角色列表和素材。
-
 <table>
   <tr>
     <td align="center"><a href="assets/concepts/blue-maid-prone-colored.png"><img src="assets/concepts/blue-maid-prone-colored.png" width="160" alt="基础大肥鱼"></a><br>基础大肥鱼</td>
@@ -17,8 +13,6 @@
     <td align="center"><a href="assets/concepts/orange-bride-prone-colored.png"><img src="assets/concepts/orange-bride-prone-colored.png" width="160" alt="克劳德"></a><br>克劳德</td>
   </tr>
 </table>
-
-图片直接引用仓库 `assets/` 中的当前彩稿。桌面版通过 [Rust 素材映射](crates/bongodsh-app/src/sprites.rs) 内嵌，插件版通过 [角色配置](plugins/dsh-bongodsh/src/characters.js) 打包为 `client.js`；两端使用相同的身体和独立双手。具体文件见 [素材清单](plugins/dsh-bongodsh/ASSETS.md)。
 
 ## 安装
 
@@ -124,7 +118,6 @@ npm run release
 | `plugins/dsh-bongodsh/` | DSH 插件、客户端源码和打包脚本   |
 | `assets/`               | 角色身体、双手彩稿及历史线稿     |
 | `docs/releases/`        | 版本更新与安装说明               |
-
 
 ## 更新记录
 
