@@ -133,6 +133,42 @@ impl Artwork {
         screen_rect(body.union(left).union(right), bounds)
     }
 
+    pub fn desktop_crop(&self) -> Rect {
+        // Reserve the full supported motion envelope so typing never resizes the native window.
+        let mut crop = Rect::NOTHING;
+        for press in [-0.2, 0.0, 1.0, 1.15] {
+            for rect in self.animated_rects(
+                HandPositions {
+                    left: press,
+                    right: press,
+                },
+                200,
+                200,
+            ) {
+                crop = crop.union(rect);
+            }
+        }
+        crop.expand(2.0)
+    }
+
+    pub fn desktop_size(&self, width: f32) -> Vec2 {
+        self.desktop_crop().size() * (width / 300.0)
+    }
+
+    pub fn desktop_canvas(&self, bounds: Rect) -> Rect {
+        let crop = self.desktop_crop();
+        let scale = bounds.width() / crop.width();
+        Rect::from_min_size(
+            bounds.min - crop.min.to_vec2() * scale,
+            vec2(300.0, 252.0) * scale,
+        )
+    }
+
+    pub fn desktop_grab(&self, grab: Vec2) -> Vec2 {
+        let crop = self.desktop_crop();
+        (grab * vec2(300.0, 252.0) - crop.min.to_vec2()) / crop.size()
+    }
+
     pub fn animated_rects(
         &self,
         positions: HandPositions,

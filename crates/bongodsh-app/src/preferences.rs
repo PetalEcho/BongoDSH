@@ -17,8 +17,8 @@ pub(crate) enum InputSource {
 }
 
 impl InputSource {
-    pub fn should_listen_globally(self, paused: bool) -> bool {
-        self == Self::Global && !paused
+    pub fn needs_listener(self, paused: bool, attached: bool) -> bool {
+        !paused && (self == Self::Global || attached)
     }
 }
 

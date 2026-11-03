@@ -238,6 +238,7 @@ window.__ModuleLoader__.load({
 
   const host = document.createElement('div');
   host.dataset.bongodsh = '';
+  host.hidden = true;
   const shadow = host.attachShadow({ mode: 'open' });
   const sheet = document.createElement('style');
   sheet.textContent = styles;
@@ -260,7 +261,7 @@ window.__ModuleLoader__.load({
   panel.hidden = true;
   panel.setAttribute('aria-label', 'BongoDSH 设置');
   panel.innerHTML = `
-    <div class="heading"><strong>BongoDSH</strong><button class="close" type="button" aria-label="关闭设置">×</button></div>
+    <div class="heading" title="拖动移动设置窗口"><strong>BongoDSH</strong><button class="close" type="button" aria-label="关闭设置">×</button></div>
     <label class="row" for="bongo-character">角色</label>
     <select id="bongo-character" name="character"></select>
     <label class="row">暂停动作<input name="paused" type="checkbox"></label>
@@ -293,6 +294,7 @@ window.__ModuleLoader__.load({
   const bodyAmplitudeOutput = panel.querySelector('output[for=bongo-body-amplitude]');
   const output = panel.querySelector('output');
   const closeButton = panel.querySelector('.close');
+  const panelHeading = panel.querySelector('.heading');
   const notice = panel.querySelector('.notice');
   const anchorStatus = panel.querySelector('.anchor-status');
   const desktopButton = panel.querySelector('.desktop');
@@ -307,6 +309,8 @@ window.__ModuleLoader__.load({
   let composer = null;
   let box = null;
   let drag = null;
+  let panelDrag = null;
+  let panelPosition = null;
   let suppressClick = false;
   let restoreFocus = null;
   let detached = false;
@@ -346,9 +350,8 @@ window.__ModuleLoader__.load({
 
   function setDetached(value) {
     detached = value;
-    host.hidden = value;
-    if (value) { resetInput(); closePanel(); }
-    else { syncSettings(); schedulePlace(); }
+    if (!value) syncSettings();
+    place();
   }
 
   function setDesktopStatus(message = '') {
@@ -481,8 +484,9 @@ window.__ModuleLoader__.load({
     // This is DSH's explicit composer marker; do not infer an input from its text.
     const candidates = document.querySelectorAll('[data-composer-card]');
     const focused = document.activeElement?.closest?.('[data-composer-card]');
-    const next = focused && visibleRect(focused) ? focused
-      : [...candidates].filter(element => visibleRect(element)).at(-1) ?? null;
+    const eligible = element => visibleRect(element) && conversationActive(element);
+    const next = focused && eligible(focused) ? focused
+      : [...candidates].filter(eligible).at(-1) ?? null;
     if (next !== composer) {
       if (composer) resizeObserver?.unobserve(composer);
       composer = next;
@@ -491,23 +495,42 @@ window.__ModuleLoader__.load({
     return visibleRect(composer);
   }
 
+  function conversationActive(element) {
+    // DSH keeps the composer in other views and pins Chat as the first tab.
+    // Use the nearest conversation tab row, without depending on translated labels.
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      const tabs = parent.querySelector('[data-conversation-tabs]');
+      if (tabs) return tabs.querySelector('[role="tab"]')?.getAttribute('aria-selected') === 'true';
+    }
+    // New conversations and the standalone preview have no tab row.
+    return true;
+  }
+
   function positionPanel() {
     if (panel.hidden || !box) return;
     const view = viewport();
     panel.style.maxHeight = `${Math.max(60, view.height - 16)}px`;
     const width = panel.offsetWidth;
     const height = panel.offsetHeight;
-    const x = model.clamp(box.x + box.width - width, view.left + 8,
+    const x = model.clamp(panelPosition?.x ?? box.x + box.width - width, view.left + 8,
       Math.max(view.left + 8, view.left + view.width - width - 8));
-    const y = model.clamp(box.y - height - 8, view.top + 8,
+    const y = model.clamp(panelPosition?.y ?? box.y - height - 8, view.top + 8,
       Math.max(view.top + 8, view.top + view.height - height - 8));
+    if (panelPosition) panelPosition = { x, y };
     panel.style.left = `${x - box.x}px`;
     panel.style.top = `${y - box.y}px`;
   }
 
   function place() {
-    if (disposed || drag || detached) return;
+    if (disposed) return;
     const rect = locateComposer();
+    // Only a visible composer belonging to the active Chat view can host the pet.
+    const hidden = detached || !rect;
+    if (host.hidden !== hidden) {
+      host.hidden = hidden;
+      if (hidden) { resetInput(); closePanel(); endDrag(true); }
+    }
+    if (hidden || drag) return;
     box = model.placement(settings, viewport(), rect);
     host.style.width = `${box.width}px`;
     host.style.height = `${box.height}px`;
@@ -527,7 +550,7 @@ window.__ModuleLoader__.load({
 
   function animate(now) {
     frame = 0;
-    if (disposed || document.hidden) return;
+    if (disposed || document.hidden || host.hidden) return;
     const moving = animation.advance(lastFrame === null ? 1 / 60 : (now - lastFrame) / 1000);
     lastFrame = now;
     render();
@@ -538,7 +561,7 @@ window.__ModuleLoader__.load({
   function apply(feedback) {
     animation.apply(feedback);
     if (motionPreference.matches) render();
-    else if (!frame && !document.hidden && !disposed) frame = win.requestAnimationFrame(animate);
+    else if (!frame && !document.hidden && !host.hidden && !disposed) frame = win.requestAnimationFrame(animate);
   }
 
   function resetInput() {
@@ -551,6 +574,7 @@ window.__ModuleLoader__.load({
   }
 
   function closePanel(restore = false) {
+    endPanelDrag();
     if (panel.hidden) return;
     panel.hidden = true;
     pet.setAttribute('aria-expanded', 'false');
@@ -559,6 +583,7 @@ window.__ModuleLoader__.load({
   }
 
   function openPanel(refreshDesktop = true) {
+    if (disposed || host.hidden) return;
     resetInput();
     restoreFocus = document.activeElement === host ? pet : document.activeElement;
     panel.hidden = false;
@@ -591,6 +616,32 @@ window.__ModuleLoader__.load({
     }
     place();
   }
+
+  function endPanelDrag() {
+    if (!panelDrag) return;
+    const { id } = panelDrag;
+    panelDrag = null;
+    if (panelHeading.hasPointerCapture(id)) panelHeading.releasePointerCapture(id);
+  }
+
+  on(panelHeading, 'pointerdown', event => {
+    if (event.button !== 0 || !event.isPrimary || event.target.closest('button')) return;
+    const rect = panel.getBoundingClientRect();
+    panelDrag = { id: event.pointerId, startX: event.clientX, startY: event.clientY, x: rect.left, y: rect.top };
+    panelHeading.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  on(panelHeading, 'pointermove', event => {
+    if (!panelDrag || event.pointerId !== panelDrag.id) return;
+    panelPosition = {
+      x: panelDrag.x + event.clientX - panelDrag.startX,
+      y: panelDrag.y + event.clientY - panelDrag.startY,
+    };
+    positionPanel();
+  });
+  on(panelHeading, 'pointerup', event => { if (event.pointerId === panelDrag?.id) endPanelDrag(); });
+  on(panelHeading, 'pointercancel', endPanelDrag);
+  on(panelHeading, 'lostpointercapture', endPanelDrag);
 
   on(pet, 'pointerdown', event => {
     if (event.button !== 0 || !event.isPrimary || !box) return;
@@ -669,7 +720,7 @@ window.__ModuleLoader__.load({
   });
   on(desktopButton, 'click', () => { void detachToDesktop(); });
   on(win, 'keydown', event => {
-    if (!event.isTrusted || document.hidden || detached || detachPending || settings.paused || !panel.hidden || ownEvent(event) || passwordEvent(event)) return;
+    if (!event.isTrusted || document.hidden || host.hidden || detachPending || settings.paused || !panel.hidden || ownEvent(event) || passwordEvent(event)) return;
     if (event.metaKey || ((event.ctrlKey || event.altKey) && !event.getModifierState('AltGraph'))) {
       resetInput();
       return;
@@ -679,7 +730,7 @@ window.__ModuleLoader__.load({
   // Always accept releases, including while a shortcut modifier is held.
   on(win, 'keyup', event => { if (state.held.has(event.code)) apply(state.release(event.code)); }, { capture: true });
   on(win, 'blur', () => { resetInput(); endDrag(true); closePanel(); });
-  on(win, 'pagehide', () => { resetInput(); endDrag(true); });
+  on(win, 'pagehide', () => { resetInput(); endDrag(true); endPanelDrag(); });
   on(win, 'pageshow', schedulePlace);
   on(win, 'focus', () => { void checkDesktop(); });
   on(document, 'visibilitychange', () => {
@@ -693,7 +744,7 @@ window.__ModuleLoader__.load({
     } else { schedulePlace(); void checkDesktop(); }
   });
   on(motionPreference, 'change', resetInput);
-  on(win, 'resize', () => { endDrag(true); schedulePlace(); });
+  on(win, 'resize', () => { endDrag(true); endPanelDrag(); schedulePlace(); });
   on(document, 'scroll', schedulePlace, { capture: true, passive: true });
   on(document, 'focusin', schedulePlace);
   on(document, 'transitionend', schedulePlace, { capture: true });
@@ -720,13 +771,14 @@ window.__ModuleLoader__.load({
     document.body.append(host);
     resizeObserver = new win.ResizeObserver(schedulePlace);
     resizeObserver.observe(document.documentElement);
+    resizeObserver.observe(panel);
     mutationObserver = new win.MutationObserver(records => {
       // Ignore our own positioning writes and avoid an observer/repaint loop.
       if (records.some(record => record.target !== host && !host.contains(record.target))) schedulePlace();
     });
     mutationObserver.observe(document.body, {
       subtree: true, childList: true, attributes: true,
-      attributeFilter: ['hidden', 'inert', 'aria-hidden', 'class', 'style', 'data-composer-card'],
+      attributeFilter: ['hidden', 'inert', 'aria-hidden', 'aria-selected', 'class', 'style', 'data-composer-card'],
     });
     syncSettings(); place(); render();
     void checkDesktop();
@@ -738,6 +790,7 @@ window.__ModuleLoader__.load({
     events.abort();
     resetInput();
     endDrag(true);
+    endPanelDrag();
     if (layoutFrame) win.cancelAnimationFrame(layoutFrame);
     resizeObserver?.disconnect();
     mutationObserver?.disconnect();
@@ -786,7 +839,7 @@ window.__ModuleLoader__.load({
     dispose() { lifetime.abort(); injection?.dispose?.(); },
   };
 };
-    const styles = "\n  :host { all: initial; position: fixed; left: 0; top: 0; z-index: 40; pointer-events: none;\n    font: 13px/1.5 -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", sans-serif; color: #2a4352; }\n  *, *::before, *::after { box-sizing: border-box; }\n  [hidden], :host([hidden]) { display: none !important; }\n  button, input, select { font: inherit; }\n  button { cursor: pointer; color: inherit; }\n  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #27768b; outline-offset: 3px; }\n  .pet { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent;\n    pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; border-radius: 45%; }\n  .pet:active { cursor: grabbing; }\n  .pet svg { width: 100%; height: 100%; display: block; overflow: visible; pointer-events: none; }\n  .pet[data-paused=\"true\"] { opacity: .62; }\n  .hint { position: absolute; right: 0; bottom: -22px; white-space: nowrap; background: #ebf8f6;\n    border: 1px solid #c7dfe3; border-radius: 6px; padding: 1px 6px; font-size: 11px;\n    opacity: 0; transition: opacity .12s; }\n  .pet:focus-visible + .hint { opacity: 1; }\n  .panel { position: absolute; width: 248px; max-width: calc(100vw - 16px); padding: 14px;\n    background: #f5fbfc; color: #2a4352; border: 1px solid #b7d4db; border-radius: 12px;\n    box-shadow: 0 5px 24px #1b455a26; pointer-events: auto; overflow-y: auto; }\n  .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }\n  .heading strong { font-size: 15px; font-weight: 650; }\n  .close { border: 0; background: transparent; padding: 2px 6px; font-size: 19px; line-height: 1; }\n  p { margin: 0 0 10px; font-size: 12px; color: #536b77; }\n  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; }\n  .row input[type=checkbox] { width: 16px; height: 16px; accent-color: #27768b; }\n  select { width: 100%; padding: 6px 8px; border: 1px solid #bad5dc; border-radius: 7px;\n    background: #fff; color: inherit; }\n  input[type=range] { --range-fill: #27768b; --range-track: #c7dfe3; --range-thumb: #f5fbfc;\n    appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 24px;\n    margin: 0 0 6px; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }\n  input[type=range]:focus-visible { outline-color: var(--range-fill); outline-offset: 2px; }\n  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;\n    background: linear-gradient(to right, var(--range-fill) var(--range-progress, 50%), var(--range-track) var(--range-progress, 50%)); }\n  input[type=range]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; box-sizing: border-box;\n    width: 14px; height: 14px; margin-top: -5px; border: 2px solid var(--range-fill); border-radius: 50%; background: var(--range-thumb); }\n  input[type=range]::-moz-range-track { height: 4px; border: 0; border-radius: 2px; background: var(--range-track); }\n  input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--range-fill); }\n  input[type=range]::-moz-range-thumb { box-sizing: border-box; width: 14px; height: 14px;\n    border: 2px solid var(--range-fill); border-radius: 50%; background: var(--range-thumb); }\n  output { font-variant-numeric: tabular-nums; color: #536b77; }\n  .actions { display: flex; gap: 8px; margin: 10px 0; }\n  .action { flex: 1; background: #e3f1f4; border: 1px solid #bad5dc; border-radius: 7px; padding: 6px 8px; }\n  .desktop { width: 100%; }\n  button:disabled { cursor: wait; opacity: .6; }\n  .note { margin: 10px 0 0; font-size: 11px; color: #536b77; }\n  .notice { color: #9b492b; }\n  @media (prefers-color-scheme: dark) {\n    .panel { background: #243b46; color: #e4f3f6; border-color: #537581; }\n    p, output, .note { color: #b6ccd5; }\n    .action { background: #345360; border-color: #5a7b88; color: #e4f3f6; }\n    select { background: #345360; border-color: #5a7b88; }\n    input[type=range] { --range-fill: #9acbd7; --range-track: #537581; --range-thumb: #243b46; }\n    .notice { color: #f5bea0; }\n  }\n  @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }\n";
+    const styles = "\n  :host { all: initial; position: fixed; left: 0; top: 0; z-index: 40; pointer-events: none;\n    font: 13px/1.5 -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", sans-serif; color: #2a4352; }\n  *, *::before, *::after { box-sizing: border-box; }\n  [hidden], :host([hidden]) { display: none !important; }\n  button, input, select { font: inherit; }\n  button { cursor: pointer; color: inherit; }\n  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #27768b; outline-offset: 3px; }\n  .pet { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent;\n    pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; border-radius: 45%; }\n  .pet:active { cursor: grabbing; }\n  .pet svg { width: 100%; height: 100%; display: block; overflow: visible; pointer-events: none; }\n  .pet[data-paused=\"true\"] { opacity: .62; }\n  .hint { position: absolute; right: 0; bottom: -22px; white-space: nowrap; background: #ebf8f6;\n    border: 1px solid #c7dfe3; border-radius: 6px; padding: 1px 6px; font-size: 11px;\n    opacity: 0; transition: opacity .12s; }\n  .pet:focus-visible + .hint { opacity: 1; }\n  .panel { position: absolute; width: 248px; max-width: calc(100vw - 16px); padding: 14px;\n    background: #f5fbfc; color: #2a4352; border: 1px solid #b7d4db; border-radius: 12px;\n    box-shadow: 0 5px 24px #1b455a26; pointer-events: auto; overflow-y: auto; }\n  .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px;\n    cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }\n  .heading strong { font-size: 15px; font-weight: 650; }\n  .close { border: 0; background: transparent; padding: 2px 6px; font-size: 19px; line-height: 1; }\n  p { margin: 0 0 10px; font-size: 12px; color: #536b77; }\n  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; }\n  .row input[type=checkbox] { width: 16px; height: 16px; accent-color: #27768b; }\n  select { width: 100%; padding: 6px 8px; border: 1px solid #bad5dc; border-radius: 7px;\n    background: #fff; color: inherit; }\n  input[type=range] { --range-fill: #27768b; --range-track: #c7dfe3; --range-thumb: #f5fbfc;\n    appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 24px;\n    margin: 0 0 6px; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }\n  input[type=range]:focus-visible { outline-color: var(--range-fill); outline-offset: 2px; }\n  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;\n    background: linear-gradient(to right, var(--range-fill) var(--range-progress, 50%), var(--range-track) var(--range-progress, 50%)); }\n  input[type=range]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; box-sizing: border-box;\n    width: 14px; height: 14px; margin-top: -5px; border: 2px solid var(--range-fill); border-radius: 50%; background: var(--range-thumb); }\n  input[type=range]::-moz-range-track { height: 4px; border: 0; border-radius: 2px; background: var(--range-track); }\n  input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--range-fill); }\n  input[type=range]::-moz-range-thumb { box-sizing: border-box; width: 14px; height: 14px;\n    border: 2px solid var(--range-fill); border-radius: 50%; background: var(--range-thumb); }\n  output { font-variant-numeric: tabular-nums; color: #536b77; }\n  .actions { display: flex; gap: 8px; margin: 10px 0; }\n  .action { flex: 1; background: #e3f1f4; border: 1px solid #bad5dc; border-radius: 7px; padding: 6px 8px; }\n  .desktop { width: 100%; }\n  button:disabled { cursor: wait; opacity: .6; }\n  .note { margin: 10px 0 0; font-size: 11px; color: #536b77; }\n  .notice { color: #9b492b; }\n  @media (prefers-color-scheme: dark) {\n    .panel { background: #243b46; color: #e4f3f6; border-color: #537581; }\n    p, output, .note { color: #b6ccd5; }\n    .action { background: #345360; border-color: #5a7b88; color: #e4f3f6; }\n    select { background: #345360; border-color: #5a7b88; }\n    input[type=range] { --range-fill: #9acbd7; --range-track: #537581; --range-thumb: #243b46; }\n    .notice { color: #f5bea0; }\n  }\n  @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }\n";
     return {
       name: 'dsh-bongodsh',
       apply(ctx) {

@@ -7,7 +7,6 @@ mod desktop;
 mod detached;
 mod docking;
 mod global_input;
-mod input;
 mod platform;
 mod positioning;
 mod preferences;
@@ -51,7 +50,7 @@ fn print_help() {
     println!(
         "BongoDSH {}\n\n\
          透明置顶的桌面打字挂件。右键选择全局键盘，在其他应用打字时触发动画。\n\
-         macOS 需主动开启输入监控权限。首次默认仅响应本窗口，之后恢复本机保存的输入模式。\n\n\
+         macOS 需主动开启输入监控权限，窗口模式另需辅助功能权限。首次默认仅响应当前吸附窗口，之后恢复本机保存的输入模式。\n\n\
          用法：\n  bongodsh           启动桌面挂件\n  bongodsh --demo    运行命令行模拟事件\n  bongodsh --help    显示帮助\n  bongodsh --detached <角色> <100..220> [--grab <0..1> <0..1>] [--paused <true|false>]\n                      [--hand-amplitude <0..200>] [--body-amplitude <0..200>]\n                      供 DSH 宿主启动，通过标准输入保留父进程连接",
         env!("CARGO_PKG_VERSION")
     );

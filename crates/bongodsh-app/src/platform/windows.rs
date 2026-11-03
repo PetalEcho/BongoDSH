@@ -14,8 +14,9 @@ use windows_sys::Win32::{
         Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON},
         WindowsAndMessaging::{
             EnumWindows, GWL_EXSTYLE, GetCursorPos, GetSystemMetrics, GetWindowLongPtrW,
-            GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SM_SWAPBUTTON,
-            SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos, WS_EX_TOOLWINDOW,
+            GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed,
+            SM_SWAPBUTTON, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
+            WS_EX_TOOLWINDOW,
         },
     },
 };
@@ -179,8 +180,28 @@ unsafe extern "system" fn window_callback(window: HWND, data: LPARAM) -> i32 {
                     process,
                 },
                 bounds,
+                maximized: IsZoomed(window) != 0,
             });
         }
     }
     1
+}
+
+pub(crate) fn has_focus_permission() -> bool {
+    true
+}
+
+pub(crate) fn window_is_focused(target: WindowId) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId,
+    };
+    // SAFETY: Both queries use OS-owned handles; pid is a writable local. No window is mutated.
+    unsafe {
+        let foreground = GetForegroundWindow();
+        let mut process = 0;
+        !foreground.is_null()
+            && foreground as usize as u64 == target.handle
+            && GetWindowThreadProcessId(foreground, &mut process) != 0
+            && process == target.process
+    }
 }

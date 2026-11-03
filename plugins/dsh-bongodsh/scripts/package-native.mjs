@@ -39,6 +39,18 @@ if (process.platform === 'darwin') {
 await copyFile(new URL(`target/release/${name}`, root), target);
 if (process.platform === 'darwin') {
   await chmod(target, 0o755);
+  // The linker signs the standalone Mach-O, not its enclosing app bundle.
+  // Seal the final Info.plist and resources so macOS can validate the app identity.
+  const app = fileURLToPath(new URL('BongoDSH Companion.app', directory));
+  for (const args of [
+    ['--force', '--sign', '-', '--identifier', 'com.petal.bongodsh.companion', app],
+    ['--verify', '--strict', app],
+  ]) {
+    const signature = spawnSync('/usr/bin/codesign', args, { stdio: 'inherit', shell: false });
+    if (signature.error || signature.status !== 0) {
+      throw new Error('The macOS app bundle could not be signed or verified.');
+    }
+  }
   // Replace the previously generated loose binary with the app bundle.
   await rm(new URL(name, directory), { force: true });
 }

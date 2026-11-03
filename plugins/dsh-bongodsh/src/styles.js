@@ -18,7 +18,8 @@ export const styles = `
   .panel { position: absolute; width: 248px; max-width: calc(100vw - 16px); padding: 14px;
     background: #f5fbfc; color: #2a4352; border: 1px solid #b7d4db; border-radius: 12px;
     box-shadow: 0 5px 24px #1b455a26; pointer-events: auto; overflow-y: auto; }
-  .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px;
+    cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }
   .heading strong { font-size: 15px; font-weight: 650; }
   .close { border: 0; background: transparent; padding: 2px 6px; font-size: 19px; line-height: 1; }
   p { margin: 0 0 10px; font-size: 12px; color: #536b77; }

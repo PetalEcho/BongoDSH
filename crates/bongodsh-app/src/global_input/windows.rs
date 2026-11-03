@@ -104,6 +104,10 @@ impl Keyboard {
         {
             return;
         }
+        let focused = self.sink.refresh_focus();
+        if !focused {
+            self.keys.reset();
+        }
         let extended = event.flags & LLKHF_EXTENDED != 0;
         let code = event.scanCode as u16 | if extended { 0x100 } else { 0 };
         let index = usize::from(code);
@@ -134,10 +138,13 @@ impl Keyboard {
         }
         let shortcut =
             MODIFIERS.iter().any(|vk| self.virtual_down[*vk]) || event.flags & LLKHF_ALTDOWN != 0;
-        if let Some(input) =
-            self.keys
-                .event(code, pressed, repeat, windows_typing_key(code), shortcut)
-        {
+        if let Some(input) = self.keys.event(
+            code,
+            pressed,
+            repeat,
+            windows_typing_key(code) && focused,
+            shortcut,
+        ) {
             self.sink.input(input);
             self.changed = true;
         }
@@ -376,6 +383,9 @@ pub(super) fn listen(sink: &Sink) -> Result<(), Status> {
         }
         STATE.with(|slot| {
             if let Some(state) = slot.borrow_mut().as_mut() {
+                if !sink.refresh_focus() {
+                    state.keys.reset();
+                }
                 if now >= next_check {
                     next_check = now + Duration::from_secs(1);
                     state.reconcile();

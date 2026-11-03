@@ -12,7 +12,6 @@ use crate::{
     detached::{self, Launch, Settings},
     docking::Docking,
     global_input::{GlobalInput, Status},
-    input,
     preferences::{self, InputSource},
     sprites::Artwork,
 };
@@ -69,6 +68,7 @@ struct Desktop {
     keyboard_settings_open: bool,
     desktop_settings_open: bool,
     desktop_settings_focused: bool,
+    desktop_settings_moved: bool,
     desktop_settings_size: egui::Vec2,
     character_error: Option<String>,
     settings_error: Option<String>,
@@ -83,8 +83,15 @@ impl Desktop {
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let ctx = &creation.egui_ctx;
         let character = launch.map_or(0, |launch| launch.character);
-        let artwork = Some(Artwork::load(ctx, character).map_err(std::io::Error::other)?);
-        let docking = Docking::new(creation, launch.map(|launch| launch.grab));
+        let artwork = Artwork::load(ctx, character).map_err(std::io::Error::other)?;
+        ctx.send_viewport_cmd(ViewportCommand::InnerSize(
+            artwork.desktop_size(launch.map_or(160.0, |launch| launch.size)),
+        ));
+        let docking = Docking::new(
+            creation,
+            launch.map(|launch| artwork.desktop_grab(launch.grab)),
+        );
+        let artwork = Some(artwork);
         if launch.is_some() && !docking.available() {
             return Err(std::io::Error::other("当前平台无法接续桌面拖动。").into());
         }
@@ -142,6 +149,7 @@ impl Desktop {
             keyboard_settings_open: false,
             desktop_settings_open: false,
             desktop_settings_focused: false,
+            desktop_settings_moved: false,
             desktop_settings_size: vec2(264.0, 410.0),
             character_error: None,
             settings_error: None,
@@ -172,9 +180,18 @@ impl Desktop {
     fn restart_input(&mut self, ctx: &egui::Context) {
         self.global.stop();
         self.reset();
-        if self.source.should_listen_globally(self.paused) {
-            self.global.start(ctx);
+        let target = self.docking.input_target();
+        if self.source.needs_listener(self.paused, target.is_some()) {
+            self.global.start(
+                ctx,
+                if self.source == InputSource::Window {
+                    target
+                } else {
+                    None
+                },
+            );
         }
+        ctx.request_repaint_of(egui::ViewportId::ROOT);
     }
 
     fn switch_source(&mut self, source: InputSource, ctx: &egui::Context) {
@@ -195,6 +212,15 @@ impl Desktop {
         self.restart_input(ctx);
     }
 
+    fn sync_input_target(&mut self, ctx: &egui::Context) {
+        if self.source == InputSource::Window
+            && !self.paused
+            && self.docking.input_target() != self.global.target()
+        {
+            self.restart_input(ctx);
+        }
+    }
+
     fn global_selected(&self) -> bool {
         self.source == InputSource::Global
             && matches!(
@@ -204,22 +230,57 @@ impl Desktop {
     }
 
     fn status_text(&self) -> &'static str {
+        if self.paused {
+            return self.text("键盘响应已暂停", "Keyboard response paused");
+        }
+        if self.source == InputSource::Window && self.docking.input_target().is_none() {
+            return self.text(
+                "窗口输入 · 等待吸附窗口",
+                "Window input · attach to a window first",
+            );
+        }
         match self.global.status() {
-            Status::Off => self.text("仅响应本窗口按键", "Keyboard input in this window"),
-            Status::Starting => self.text("正在连接全局键盘", "Connecting global keyboard"),
-            Status::Listening => self.text("全局键盘已连接", "Global keyboard connected"),
+            Status::Off => self.text("键盘监听未连接", "Keyboard listener disconnected"),
+            Status::Starting => self.text("正在连接键盘监听", "Connecting keyboard listener"),
+            Status::Listening if self.source == InputSource::Window && !self.global.focused() => {
+                self.text(
+                    "窗口已连接 · 等待吸附窗口获得焦点",
+                    "Connected · waiting for attached window focus",
+                )
+            }
+            Status::Listening
+                if self.source == InputSource::Window && self.global.received_input() =>
+            {
+                self.text(
+                    "窗口已连接 · 已收到按键",
+                    "Window connected · input received",
+                )
+            }
+            Status::Listening if self.source == InputSource::Window => {
+                self.text("窗口已连接 · 等待按键", "Window connected · awaiting input")
+            }
+            Status::Listening if self.global.received_input() => self.text(
+                "全局已连接 · 已收到按键",
+                "Global connected · input received",
+            ),
+            Status::Listening => {
+                self.text("全局已连接 · 等待按键", "Global connected · awaiting input")
+            }
             Status::Suspended => self.text(
                 "系统暂时限制键盘监听",
                 "Keyboard capture suspended by system",
             ),
             Status::PermissionRequired => self.text(
-                "需要输入监控权限 · 暂用窗口输入",
-                "Input Monitoring required; using window input",
+                "未授权输入监控 · 无法监听键盘",
+                "Input Monitoring required to listen",
             ),
-            Status::Failed(_) => self.text(
-                "全局监听不可用 · 暂用窗口输入",
-                "Global capture unavailable; using window input",
+            Status::FocusPermissionRequired => self.text(
+                "未授权辅助功能 · 无法识别吸附窗口焦点",
+                "Accessibility required to identify the focused window",
             ),
+            Status::Failed(_) => {
+                self.text("键盘监听连接失败", "Keyboard listener connection failed")
+            }
         }
     }
 
@@ -231,8 +292,12 @@ impl Desktop {
             ui.radio_value(
                 &mut source,
                 InputSource::Window,
-                self.text("窗口输入", "Window"),
-            );
+                self.text("吸附窗口", "Attached window"),
+            )
+            .on_hover_text(self.text(
+                "仅响应当前吸附窗口中的打字，切换到其他窗口后停止响应。",
+                "Responds only while typing in the attached window; stops in other windows.",
+            ));
             ui.radio_value(
                 &mut source,
                 InputSource::Global,
@@ -251,16 +316,18 @@ impl Desktop {
         } else {
             ui.small(self.text("重启后恢复此选择。", "Restored after restart."));
         }
-        if self.paused {
-            ui.small(self.text("键盘响应已暂停", "Keyboard response paused"));
-        } else if self.source == InputSource::Global {
-            ui.small(self.status_text());
+        if self.source == InputSource::Window {
+            ui.small(self.text(
+                "先将挂件吸附到窗口，再在该窗口打字。未吸附时不响应。",
+                "Attach the companion to a window, then type there. No input while detached.",
+            ));
         }
+        self.keyboard_connection(ui);
         if let Status::Failed(error) = self.global.status() {
             ui.colored_label(Color32::from_rgb(160, 76, 60), error);
         }
         #[cfg(target_os = "macos")]
-        if self.source == InputSource::Global {
+        {
             if matches!(
                 self.global.status(),
                 Status::PermissionRequired | Status::Failed(_)
@@ -280,7 +347,7 @@ impl Desktop {
                     .clicked()
                 {
                     crate::global_input::request_permission();
-                    self.switch_source(InputSource::Global, ui.ctx());
+                    self.restart_input(ui.ctx());
                 }
                 if ui
                     .button(self.text("系统设置", "System Settings"))
@@ -290,13 +357,88 @@ impl Desktop {
                 }
             });
         }
-        if self.source == InputSource::Global
-            && ui.button(self.text("重新连接", "Reconnect")).clicked()
-        {
-            self.restart_input(ui.ctx());
+        #[cfg(target_os = "macos")]
+        if self.source == InputSource::Window {
+            ui.small(self.text(
+                "窗口模式还需辅助功能权限，仅用于判断窗口焦点，不读取输入内容。",
+                "Window mode also needs Accessibility to identify focus, without reading text.",
+            ));
+            ui.horizontal_wrapped(|ui| {
+                if ui
+                    .button(self.text("授权辅助功能", "Allow Accessibility"))
+                    .clicked()
+                {
+                    crate::platform::request_focus_permission();
+                    self.restart_input(ui.ctx());
+                }
+                if ui
+                    .button(self.text("辅助功能设置", "Accessibility settings"))
+                    .clicked()
+                {
+                    self.settings_error = crate::platform::open_focus_settings().err();
+                }
+            });
         }
         if let Some(error) = &self.settings_error {
             ui.colored_label(Color32::from_rgb(160, 76, 60), error);
+        }
+    }
+
+    fn keyboard_connection(&mut self, ui: &mut egui::Ui) {
+        let connecting = self.global.status() == &Status::Starting && !self.paused;
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled(
+                    !self.paused && !connecting,
+                    egui::Button::new(self.text(
+                        if connecting {
+                            "连接中…"
+                        } else {
+                            "重新连接"
+                        },
+                        if connecting {
+                            "Connecting…"
+                        } else {
+                            "Reconnect"
+                        },
+                    )),
+                )
+                .clicked()
+            {
+                self.restart_input(ui.ctx());
+            }
+            if self.global.status() == &Status::Starting && !self.paused {
+                ui.spinner();
+            }
+        });
+        let color = if self.paused {
+            ui.visuals().weak_text_color()
+        } else {
+            match self.global.status() {
+                Status::Listening => Color32::from_rgb(55, 150, 115),
+                Status::PermissionRequired
+                | Status::FocusPermissionRequired
+                | Status::Failed(_) => Color32::from_rgb(190, 90, 70),
+                _ => Color32::from_rgb(180, 135, 65),
+            }
+        };
+        ui.colored_label(color, self.status_text());
+        if self.paused {
+            ui.small(self.text("先取消“暂停动作”再连接。", "Resume animation to connect."));
+        } else if self.global.status() == &Status::Listening {
+            ui.small(if self.global.received_input() {
+                self.text(
+                    "本次连接已收到按键。若没有动作，请检查手部和身体幅度是否为 0%。",
+                    "Input received in this session. If motion is absent, check that the amplitudes are above 0%.",
+                )
+            } else if self.source == InputSource::Window {
+                self.text("请在吸附窗口的文本框中试打。切换窗口、取消吸附后停止响应。", "Type in the attached window. Input stops when focus or attachment changes.")
+            } else {
+                self.text(
+                    "监听已启动，请在其他应用普通文本框中试打。不响应粘贴或组合快捷键。",
+                    "Listener started. Try a normal text field in another app. Paste and shortcuts do not animate.",
+                )
+            });
         }
     }
 
@@ -415,27 +557,13 @@ impl eframe::App for Desktop {
             return;
         }
         let now = Instant::now();
-        let settings_active = self.desktop_settings_open || self.keyboard_settings_open;
         let events = self.global.poll();
-        if !settings_active && !self.paused {
+        if !self.paused {
             for event in events {
                 self.apply(event);
             }
         }
-        let local_input = !self.global_selected();
-        ctx.input(|state| {
-            if local_input && !state.focused && self.focused {
-                self.reset();
-            }
-            self.focused = state.focused;
-            if !settings_active && local_input && state.focused && !self.paused {
-                for event in &state.events {
-                    if let Some(input) = input::normalize(event) {
-                        self.apply(input);
-                    }
-                }
-            }
-        });
+        self.focused = ctx.input(|state| state.focused);
         if self
             .animation
             .advance(now.saturating_duration_since(self.last_frame))
@@ -446,12 +574,15 @@ impl eframe::App for Desktop {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let bounds = ui.max_rect();
+        let bounds = self.artwork.as_ref().map_or(ui.max_rect(), |artwork| {
+            artwork.desktop_canvas(ui.max_rect())
+        });
         let hit = self.artwork.as_ref().map_or_else(
             || art::hit_bounds(bounds),
             |artwork| artwork.content_bounds(bounds),
         );
         self.docking.update(ui.ctx(), hit);
+        self.sync_input_target(ui.ctx());
         let response = ui.interact(
             hit,
             ui.id().with("character"),
@@ -466,6 +597,7 @@ impl eframe::App for Desktop {
             if response.secondary_clicked() {
                 self.reset();
                 self.desktop_settings_focused = false;
+                self.desktop_settings_moved = false;
                 self.desktop_settings_open = true;
             }
         } else {
@@ -541,7 +673,7 @@ impl eframe::App for Desktop {
                 )
             } else {
                 (
-                    self.text("点击后打字 · 拖动移动", "Click to type · drag to move"),
+                    self.text("吸附窗口后打字 · 拖动移动", "Attach to type · drag to move"),
                     art::INK,
                 )
             };
@@ -557,6 +689,7 @@ impl eframe::App for Desktop {
         }
         self.keyboard_window(ui.ctx());
         self.desktop_window(ui.ctx());
+        self.sync_input_target(ui.ctx());
         self.publish_settings(Some(ui.ctx()));
     }
 

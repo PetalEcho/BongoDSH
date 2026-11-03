@@ -163,7 +163,147 @@ pub fn visible_windows() -> Vec<TargetWindow> {
                     process,
                 },
                 bounds,
+                maximized: false,
             })
         })
         .collect()
+}
+
+// SAFETY: Signatures and AXValue type tags follow the public HIServices headers.
+// CFTypeRef is used for opaque AX objects, with runtime type checks before use.
+#[link(name = "ApplicationServices", kind = "framework")]
+unsafe extern "C" {
+    fn AXIsProcessTrusted() -> u8;
+    fn AXIsProcessTrustedWithOptions(options: core_foundation::dictionary::CFDictionaryRef) -> u8;
+    fn AXUIElementCreateSystemWide() -> core_foundation::base::CFTypeRef;
+    fn AXUIElementGetTypeID() -> core_foundation::base::CFTypeID;
+    fn AXUIElementSetMessagingTimeout(
+        element: core_foundation::base::CFTypeRef,
+        timeout: f32,
+    ) -> i32;
+    fn AXUIElementCopyAttributeValue(
+        element: core_foundation::base::CFTypeRef,
+        attribute: core_foundation::string::CFStringRef,
+        value: *mut core_foundation::base::CFTypeRef,
+    ) -> i32;
+    fn AXUIElementGetPid(element: core_foundation::base::CFTypeRef, pid: *mut i32) -> i32;
+    fn AXValueGetTypeID() -> core_foundation::base::CFTypeID;
+    fn AXValueGetValue(
+        value: core_foundation::base::CFTypeRef,
+        kind: u32,
+        output: *mut std::ffi::c_void,
+    ) -> u8;
+}
+
+pub(crate) fn has_focus_permission() -> bool {
+    // SAFETY: Read-only permission preflight, no pointers and no system prompt.
+    unsafe { AXIsProcessTrusted() != 0 }
+}
+
+pub(crate) fn request_focus_permission() -> bool {
+    let options = CFDictionary::from_CFType_pairs(&[(
+        CFString::new("AXTrustedCheckOptionPrompt").as_CFType(),
+        core_foundation::boolean::CFBoolean::true_value().as_CFType(),
+    )]);
+    // SAFETY: This valid options dictionary lives through the synchronous call.
+    // Called only by an explicit UI authorization action.
+    unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) != 0 }
+}
+
+pub(crate) fn open_focus_settings() -> Result<(), String> {
+    std::process::Command::new("/usr/bin/open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        .status()
+        .map_err(|error| error.to_string())?
+        .success()
+        .then_some(())
+        .ok_or_else(|| "Cannot open Accessibility settings".to_owned())
+}
+
+fn focus_attribute(element: &CFType, name: &str) -> Option<CFType> {
+    let attribute = CFString::new(name);
+    let mut value = std::ptr::null();
+    // SAFETY: Runtime check ensures an AX element, and the output is writable.
+    // Copy returns an owned CF object, released by the wrapper on every path.
+    unsafe {
+        if element.type_of() != AXUIElementGetTypeID() {
+            return None;
+        }
+        let result = AXUIElementCopyAttributeValue(
+            element.as_CFTypeRef(),
+            attribute.as_concrete_TypeRef(),
+            &mut value,
+        );
+        let value = (!value.is_null()).then(|| CFType::wrap_under_create_rule(value));
+        (result == 0).then_some(value).flatten()
+    }
+}
+
+fn focused_geometry() -> Option<(u32, Rect)> {
+    use core_graphics::geometry::{CGPoint, CGSize};
+    // SAFETY: Create returns an owned AX system element, checked for null. The
+    // process-wide 5 ms IPC timeout bounds queries to unresponsive applications.
+    let system = unsafe {
+        let raw = AXUIElementCreateSystemWide();
+        if raw.is_null() {
+            return None;
+        }
+        let system = CFType::wrap_under_create_rule(raw);
+        if AXUIElementSetMessagingTimeout(raw, 0.005) != 0 {
+            return None;
+        }
+        system
+    };
+    let app = focus_attribute(&system, "AXFocusedApplication")?;
+    let mut pid = 0;
+    // SAFETY: Verify the returned object is an AX element before querying its PID.
+    unsafe {
+        if app.type_of() != AXUIElementGetTypeID()
+            || AXUIElementGetPid(app.as_CFTypeRef(), &mut pid) != 0
+        {
+            return None;
+        }
+    }
+    let window = focus_attribute(&app, "AXFocusedWindow")?;
+    let position = focus_attribute(&window, "AXPosition")?;
+    let size = focus_attribute(&window, "AXSize")?;
+    let mut point = CGPoint::new(0.0, 0.0);
+    let mut extent = CGSize::new(0.0, 0.0);
+    // SAFETY: Both values are checked as AXValue. Tags 1/2 request CGPoint/CGSize
+    // and outputs point to correctly sized, aligned local structs. No text is read.
+    unsafe {
+        if position.type_of() != AXValueGetTypeID()
+            || size.type_of() != AXValueGetTypeID()
+            || AXValueGetValue(
+                position.as_CFTypeRef(),
+                1,
+                (&mut point as *mut CGPoint).cast(),
+            ) == 0
+            || AXValueGetValue(size.as_CFTypeRef(), 2, (&mut extent as *mut CGSize).cast()) == 0
+        {
+            return None;
+        }
+    }
+    let bounds = Rect::from_min_size(
+        pos2(point.x as f32, point.y as f32),
+        vec2(extent.width as f32, extent.height as f32),
+    );
+    bounds
+        .is_finite()
+        .then_some((u32::try_from(pid).ok()?, bounds))
+}
+
+pub(crate) fn window_is_focused(target: WindowId) -> bool {
+    if !has_focus_permission() {
+        return false;
+    }
+    let Some((process, bounds)) = focused_geometry() else {
+        return false;
+    };
+    if process != target.process {
+        return false;
+    }
+    // Public AX APIs expose geometry, not CGWindowID. Require a unique match;
+    // overlapping identical windows or unsupported AX providers fail closed.
+    crate::positioning::identify_focused_window(process, bounds, &visible_windows()) == Some(target)
 }

@@ -99,7 +99,10 @@ impl Desktop {
             .with_transparent(true)
             .with_always_on_top()
             .with_active(true);
-        if let Some((position, _)) = self.docking.panel_geometry(size) {
+        // Once dragged, let the OS keep the chosen position instead of following the pet.
+        if !self.desktop_settings_moved
+            && let Some((position, _)) = self.docking.panel_geometry(size)
+        {
             builder = builder.with_position(position);
         }
         ctx.show_viewport_immediate(
@@ -154,7 +157,6 @@ impl Desktop {
 
     fn desktop_panel(&mut self, ui: &mut egui::Ui, palette: &Palette) {
         ui.horizontal(|ui| {
-            ui.label(RichText::new("BongoDSH").size(15.0).strong());
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
                     .add(egui::Button::new(RichText::new("×").size(19.0)).frame(false))
@@ -163,9 +165,23 @@ impl Desktop {
                 {
                     self.close_desktop_settings(ui.ctx());
                 }
+                let title = ui
+                    .add_sized(
+                        vec2(ui.available_width(), 28.0),
+                        egui::Label::new(RichText::new("BongoDSH").size(15.0).strong())
+                            .halign(Align::Min)
+                            .sense(egui::Sense::drag()),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::Grab)
+                    .on_hover_text(self.text("拖动移动设置窗口", "Drag to move settings"));
+                if title.drag_started_by(egui::PointerButton::Primary) {
+                    self.desktop_settings_moved = true;
+                    ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+                }
             });
         });
         ui.add_space(4.0);
+        ui.small(self.status_text());
         ui.label(self.text("角色", "Character"));
         let mut character = self.character;
         let label = LABELS[character];
@@ -180,6 +196,10 @@ impl Desktop {
         if character != self.character {
             match Artwork::load(ui.ctx(), character) {
                 Ok(artwork) => {
+                    ui.ctx().send_viewport_cmd_to(
+                        egui::ViewportId::ROOT,
+                        ViewportCommand::InnerSize(artwork.desktop_size(self.character_size)),
+                    );
                     self.artwork = Some(artwork);
                     self.character = character;
                     self.character_error = None;
@@ -226,9 +246,9 @@ impl Desktop {
             self.character_size = self.character_size.round();
             ui.ctx().send_viewport_cmd_to(
                 egui::ViewportId::ROOT,
-                ViewportCommand::InnerSize(vec2(
-                    self.character_size,
-                    self.character_size * 252.0 / 300.0,
+                ViewportCommand::InnerSize(self.artwork.as_ref().map_or(
+                    vec2(self.character_size, self.character_size * 252.0 / 300.0),
+                    |artwork| artwork.desktop_size(self.character_size),
                 )),
             );
             self.docking.invalidate_geometry();

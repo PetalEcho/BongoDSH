@@ -5,8 +5,10 @@ use raw_window_handle::HasWindowHandle;
 
 use crate::{
     platform::{NativeWindow, Observer},
-    positioning::{Placement, clamp_to_monitors},
+    positioning::{Placement, TargetWindow, WindowId, clamp_to_monitors},
 };
+
+mod highlight;
 
 pub(crate) struct Docking {
     native: Option<NativeWindow>,
@@ -22,6 +24,7 @@ pub(crate) struct Docking {
     awaiting: bool,
     generation: u64,
     next_check: Instant,
+    windows: Vec<TargetWindow>,
 }
 
 impl Docking {
@@ -54,11 +57,18 @@ impl Docking {
             awaiting: false,
             generation: 0,
             next_check: Instant::now(),
+            windows: Vec::new(),
         }
     }
 
     pub fn available(&self) -> bool {
         self.native.is_some() && self.observer.is_some()
+    }
+
+    pub fn input_target(&self) -> Option<WindowId> {
+        self.placement
+            .target()
+            .filter(|_| self.enabled && !self.dragging)
     }
 
     pub fn enabled(&self) -> bool {
@@ -114,6 +124,7 @@ impl Docking {
         self.dragging = true;
         self.needs_snap = false;
         self.generation = self.generation.wrapping_add(1);
+        self.next_check = Instant::now();
     }
 
     pub fn update(&mut self, ctx: &egui::Context, content: Rect) {
@@ -163,14 +174,19 @@ impl Docking {
         }
         while let Some(snapshot) = observer.receive() {
             self.awaiting = false;
-            if self.dragging || snapshot.generation != self.generation {
+            if snapshot.generation != self.generation {
+                continue;
+            }
+            self.windows = snapshot.windows;
+            if self.dragging {
+                self.next_check = now + Duration::from_millis(100);
                 continue;
             }
             let position = if self.needs_snap {
                 self.needs_snap = false;
-                self.placement.snap(widget, &snapshot.windows)
+                self.placement.snap(widget, &self.windows)
             } else {
-                self.placement.update(widget, &snapshot.windows)
+                self.placement.update(widget, &self.windows)
             };
             let position = clamp_to_monitors(
                 position.unwrap_or(widget.outer.min),
@@ -179,12 +195,16 @@ impl Docking {
             );
             if position.distance(widget.outer.min) > 0.5 {
                 native.move_to(position);
+                let delta = position - widget.outer.min;
+                widget.outer = widget.outer.translate(delta);
+                widget.content = widget.content.translate(delta);
             }
             self.next_check = now + Duration::from_millis(200);
         }
         if self.dragging {
             ctx.request_repaint_after(Duration::from_millis(16));
-        } else if self.enabled && (self.needs_snap || self.placement.attached()) {
+        }
+        if self.enabled && (self.dragging || self.needs_snap || self.placement.attached()) {
             if !self.awaiting && now >= self.next_check {
                 self.awaiting = observer.request(self.generation);
                 if !self.awaiting {
@@ -193,6 +213,13 @@ impl Docking {
             }
             if !self.awaiting {
                 ctx.request_repaint_after(self.next_check.saturating_duration_since(now));
+            }
+        }
+        if self.enabled && self.dragging {
+            let mut placement = Placement::default();
+            placement.snap(widget, &self.windows);
+            if let Some(preview) = placement.highlight(widget, &self.windows, &monitors) {
+                highlight::show(ctx, preview, widget.scale);
             }
         }
     }

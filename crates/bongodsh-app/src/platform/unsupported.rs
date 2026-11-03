@@ -24,3 +24,10 @@ impl NativeWindow {
 pub(crate) fn visible_windows() -> Vec<TargetWindow> {
     Vec::new()
 }
+
+pub(crate) fn has_focus_permission() -> bool {
+    false
+}
+pub(crate) fn window_is_focused(_: crate::positioning::WindowId) -> bool {
+    false
+}

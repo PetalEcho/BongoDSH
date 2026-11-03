@@ -10,6 +10,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
+use crate::positioning::WindowId;
 use bongodsh_core::InputEvent;
 use eframe::egui;
 
@@ -37,6 +38,7 @@ pub(crate) enum Status {
     Listening,
     Suspended,
     PermissionRequired,
+    FocusPermissionRequired,
     Failed(String),
 }
 
@@ -58,10 +60,28 @@ struct Sink {
     overflow: Arc<AtomicBool>,
     stopped: Arc<AtomicBool>,
     context: egui::Context,
+    target: Option<WindowId>,
+    focused: Arc<AtomicBool>,
 }
 
 impl Sink {
+    fn refresh_focus(&self) -> bool {
+        let focused = self.target.is_none_or(crate::platform::window_is_focused);
+        self.update_focus(focused);
+        focused
+    }
+
+    fn update_focus(&self, focused: bool) {
+        if self.focused.swap(focused, Ordering::AcqRel) != focused {
+            self.input(InputEvent::Reset);
+            self.wake();
+        }
+    }
+
     fn input(&self, event: InputEvent) {
+        if event != InputEvent::Reset && !self.focused.load(Ordering::Acquire) {
+            return;
+        }
         if self.stopped.load(Ordering::Acquire) || self.overflow.load(Ordering::Acquire) {
             return;
         }
@@ -103,6 +123,9 @@ impl Drop for Session {
 pub(crate) struct GlobalInput {
     session: Option<Session>,
     status: Status,
+    received_input: bool,
+    target: Option<WindowId>,
+    focused: Arc<AtomicBool>,
 }
 
 impl GlobalInput {
@@ -110,8 +133,26 @@ impl GlobalInput {
         &self.status
     }
 
-    pub(crate) fn start(&mut self, context: &egui::Context) {
+    pub(crate) fn received_input(&self) -> bool {
+        self.received_input
+    }
+
+    pub(crate) fn target(&self) -> Option<WindowId> {
+        self.target
+    }
+
+    pub(crate) fn focused(&self) -> bool {
+        self.focused.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn start(&mut self, context: &egui::Context, target: Option<WindowId>) {
         self.stop();
+        self.target = target;
+        self.focused = Arc::new(AtomicBool::new(target.is_none()));
+        if target.is_some() && !crate::platform::has_focus_permission() {
+            self.status = Status::FocusPermissionRequired;
+            return;
+        }
         if !platform::has_permission() {
             self.status = Status::PermissionRequired;
             return;
@@ -126,6 +167,8 @@ impl GlobalInput {
             overflow: Arc::clone(&overflow),
             stopped: Arc::clone(&stopped),
             context: context.clone(),
+            target,
+            focused: Arc::clone(&self.focused),
         };
         match thread::Builder::new()
             .name("bongodsh-keyboard".to_owned())
@@ -160,6 +203,9 @@ impl GlobalInput {
     pub(crate) fn stop(&mut self) {
         self.session = None;
         self.status = Status::Off;
+        self.received_input = false;
+        self.target = None;
+        self.focused.store(false, Ordering::Release);
     }
 
     pub(crate) fn poll(&mut self) -> Vec<InputEvent> {
@@ -167,6 +213,9 @@ impl GlobalInput {
             return Vec::new();
         };
         for status in session.statuses.try_iter() {
+            if status != Status::Listening {
+                self.received_input = false;
+            }
             self.status = status;
         }
         let mut events: Vec<_> = session.events.try_iter().take(QUEUE_CAPACITY).collect();
@@ -176,14 +225,28 @@ impl GlobalInput {
             events.clear();
             events.push(InputEvent::Reset);
         }
-        if matches!(self.status, Status::PermissionRequired | Status::Failed(_)) {
+        if matches!(
+            self.status,
+            Status::PermissionRequired | Status::FocusPermissionRequired | Status::Failed(_)
+        ) {
             self.session = None;
+            self.received_input = false;
             return vec![InputEvent::Reset];
         }
         if session.thread.as_ref().is_some_and(JoinHandle::is_finished) {
             self.session = None;
             self.status = Status::Failed("Keyboard listener stopped".to_owned());
+            self.received_input = false;
             return vec![InputEvent::Reset];
+        }
+        if self.status == Status::Listening {
+            for event in &events {
+                match event {
+                    InputEvent::Reset => self.received_input = false,
+                    InputEvent::Press { repeat: false, .. } => self.received_input = true,
+                    _ => {}
+                }
+            }
         }
         events
     }

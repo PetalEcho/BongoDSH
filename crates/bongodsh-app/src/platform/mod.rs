@@ -1,4 +1,4 @@
-//! Window probes never request titles, accessibility values, or screenshots.
+//! Window probes read only identity, geometry and focus, never titles or input content.
 
 use std::sync::mpsc::{self, Receiver, SyncSender};
 
@@ -68,3 +68,12 @@ impl Observer {
         self.replies.try_recv().ok()
     }
 }
+
+#[cfg(target_os = "macos")]
+pub(crate) use macos::{
+    has_focus_permission, open_focus_settings, request_focus_permission, window_is_focused,
+};
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub(crate) use unsupported::{has_focus_permission, window_is_focused};
+#[cfg(target_os = "windows")]
+pub(crate) use windows::{has_focus_permission, window_is_focused};

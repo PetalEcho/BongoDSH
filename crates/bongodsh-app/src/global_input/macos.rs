@@ -127,6 +127,10 @@ unsafe extern "C-unwind" fn on_event(
     if state.suspended || state.sleeping || secure_input() {
         return event.as_ptr();
     }
+    if !state.sink.refresh_focus() {
+        state.keys.reset();
+        return event.as_ptr();
+    }
     // SAFETY: Ordinary key callbacks supply a live event for this call only.
     let key_event = Some(unsafe { event.as_ref() });
     let Ok(code) = u16::try_from(CGEvent::integer_value_field(
@@ -296,6 +300,9 @@ pub(super) fn listen(sink: &Sink) -> Result<(), Status> {
     let mut next_check = Instant::now();
     while !sink.stopped.load(Ordering::Acquire) {
         state.check_sleep_gap();
+        if !sink.refresh_focus() {
+            state.keys.reset();
+        }
         let suspended = state.sleeping || secure_input();
         if state.suspended != suspended {
             state.reset();
@@ -308,6 +315,9 @@ pub(super) fn listen(sink: &Sink) -> Result<(), Status> {
         }
         if Instant::now() >= next_check {
             next_check = Instant::now() + Duration::from_secs(1);
+            if sink.target.is_some() && !crate::platform::has_focus_permission() {
+                return Err(Status::FocusPermissionRequired);
+            }
             if !has_permission() {
                 return Err(Status::PermissionRequired);
             }

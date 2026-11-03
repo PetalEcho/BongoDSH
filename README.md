@@ -18,11 +18,11 @@ BongoDSH 是一个随按键动作的小角色：双手拍下，身体轻轻回�
   </tr>
 </table>
 
-以上展示的是当前源码中的角色。角色移除、更名，以及水手鱼、睡衣鱼和魔法师鱼的重绘尚未发布，下方的 0.2.5 安装包不包含这些更新。
+0.2.6 安装包包含以上五款角色和最新重绘素材。
 
 ## 安装到 DSH
 
-安装包版本为 **0.2.5**。插件要求 DSH **0.2.1-rc.5 或更高版本**，已完成的安装验证使用 0.2.1-rc.5。
+安装包版本为 **0.2.6**。插件要求 DSH **0.2.1-rc.5 或更高版本**，已完成的安装验证使用 0.2.1-rc.5。
 
 1. 复制对应平台的安装包链接。
 2. 在 DSH「插件 → 添加插件」中粘贴链接，安装并启用。
@@ -30,23 +30,23 @@ BongoDSH 是一个随按键动作的小角色：双手拍下，身体轻轻回�
 
 | 平台                | 安装包                                                                                                          |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| macOS Apple Silicon | [下载 0.2.5](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-arm64.tgz) |
-| macOS Intel         | [下载 0.2.5](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-x64.tgz)   |
-| Windows x64         | [下载 0.2.5](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-win32-x64.tgz)    |
+| macOS Apple Silicon | [下载 0.2.6](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.6/dsh-bongodsh-0.2.6-darwin-arm64.tgz) |
+| macOS Intel         | [下载 0.2.6](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.6/dsh-bongodsh-0.2.6-darwin-x64.tgz)   |
+| Windows x64         | [下载 0.2.6](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.6/dsh-bongodsh-0.2.6-win32-x64.tgz)    |
 
 完整包包含页面插件、角色素材和对应平台的桌面程序，无需安装 Rust。macOS 包尚未经过 Developer ID 签名和公证；Intel Mac 与 Windows x64 的界面尚未实机验证。
 
 也可以通过命令行安装。以 macOS Apple Silicon 为例，`web` 按实际 DSH profile 名称调整，其他平台替换为对应安装包链接：
 
 ```sh
-dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-arm64.tgz
+dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.6/dsh-bongodsh-0.2.6-darwin-arm64.tgz
 ```
 
 其他版本的安装包可在 [Releases](https://github.com/PetalEcho/BongoDSH/releases) 查看。
 
 ## 使用
 
-页面中点击或右键角色打开设置，桌面上使用右键；按 Escape 收起面板。页面还支持用 Tab 聚焦角色、Enter 打开设置。
+页面中点击或右键角色打开设置，桌面上使用右键；按 Escape 收起面板。页面还支持用 Tab 聚焦角色、Enter 打开设置。两端设置窗口均可拖动顶部标题栏移动。页面角色只在对话 Tab 显示，切到轨迹、上下文或编队时隐藏，返回对话后恢复。
 
 | 操作               | 方法                                                                      |
 | ------------------ | ------------------------------------------------------------------------- |
@@ -54,7 +54,7 @@ dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/down
 | 调整大小           | 拖动「角色大小」，范围为 100–220 px                                      |
 | 调整动作           | 分别设置「手部幅度」和「身体幅度」，范围为 0–200%；0% 停止对应部位的动作 |
 | 暂停反馈           | 开启「暂停动作」                                                          |
-| 跟随 DSH 输入框    | 开启「跟随输入框」；找不到输入框时退回页面边缘                            |
+| 跟随 DSH 输入框    | 开启「跟随输入框」；非对话 Tab 自动隐藏                            |
 | 移到桌面           | 将角色拖出 DSH 窗口，或点击「移到桌面」                                   |
 | 吸附其他窗口       | 在桌面模式开启「吸附窗口」，再将角色拖近窗口边缘                          |
 | 返回页面           | 在桌面设置中点击「返回 DSH」                                              |
@@ -69,9 +69,9 @@ DSH 退出或禁用插件时，会关闭由它启动的桌面角色。独立启�
 
 页面模式只响应当前页面的按键，不需要系统键盘权限。密码框及常规 Ctrl / Command / Alt 快捷键不触发动作。
 
-桌面首次使用默认只响应窗口内输入。需要在其他程序中打字时触发动作，可主动开启「全局键盘」。macOS 首次开启需要输入监控权限；输入模式会保存在本机，重启或再次拖出后恢复，但恢复时不会自动申请权限。
+桌面首次使用默认选择「吸附窗口」，仅响应当前吸附且获得焦点的窗口，未吸附时不响应。「全局键盘」则响应所有应用。macOS 两种模式都需输入监控权限，窗口模式另需辅助功能权限以判断焦点；输入模式会保存在本机，重启或再次拖出后恢复，但恢复时不会自动申请权限。
 
-缺少权限或监听失败时，设置面板会显示原因并保留原有选择，暂用窗口输入。系统限制期间暂停全局反馈。
+缺少权限或监听失败时，设置面板会显示原因并停止响应，保留原有选择。系统限制期间暂停键盘反馈。
 
 两种模式都只处理物理按键，不读取、记录或上传输入文字，也不按输入法最终上屏字数补造动画。桌面吸附只使用窗口位置与尺寸，不识别其他程序的输入框。DSH 页面定位依赖输入框标记，原生输入框定位和任务事件尚未接入。
 

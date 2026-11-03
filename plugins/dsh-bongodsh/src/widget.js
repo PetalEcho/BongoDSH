@@ -28,6 +28,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
 
   const host = document.createElement('div');
   host.dataset.bongodsh = '';
+  host.hidden = true;
   const shadow = host.attachShadow({ mode: 'open' });
   const sheet = document.createElement('style');
   sheet.textContent = styles;
@@ -50,7 +51,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   panel.hidden = true;
   panel.setAttribute('aria-label', 'BongoDSH 设置');
   panel.innerHTML = `
-    <div class="heading"><strong>BongoDSH</strong><button class="close" type="button" aria-label="关闭设置">×</button></div>
+    <div class="heading" title="拖动移动设置窗口"><strong>BongoDSH</strong><button class="close" type="button" aria-label="关闭设置">×</button></div>
     <label class="row" for="bongo-character">角色</label>
     <select id="bongo-character" name="character"></select>
     <label class="row">暂停动作<input name="paused" type="checkbox"></label>
@@ -83,6 +84,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   const bodyAmplitudeOutput = panel.querySelector('output[for=bongo-body-amplitude]');
   const output = panel.querySelector('output');
   const closeButton = panel.querySelector('.close');
+  const panelHeading = panel.querySelector('.heading');
   const notice = panel.querySelector('.notice');
   const anchorStatus = panel.querySelector('.anchor-status');
   const desktopButton = panel.querySelector('.desktop');
@@ -97,6 +99,8 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   let composer = null;
   let box = null;
   let drag = null;
+  let panelDrag = null;
+  let panelPosition = null;
   let suppressClick = false;
   let restoreFocus = null;
   let detached = false;
@@ -136,9 +140,8 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
 
   function setDetached(value) {
     detached = value;
-    host.hidden = value;
-    if (value) { resetInput(); closePanel(); }
-    else { syncSettings(); schedulePlace(); }
+    if (!value) syncSettings();
+    place();
   }
 
   function setDesktopStatus(message = '') {
@@ -271,8 +274,9 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     // This is DSH's explicit composer marker; do not infer an input from its text.
     const candidates = document.querySelectorAll('[data-composer-card]');
     const focused = document.activeElement?.closest?.('[data-composer-card]');
-    const next = focused && visibleRect(focused) ? focused
-      : [...candidates].filter(element => visibleRect(element)).at(-1) ?? null;
+    const eligible = element => visibleRect(element) && conversationActive(element);
+    const next = focused && eligible(focused) ? focused
+      : [...candidates].filter(eligible).at(-1) ?? null;
     if (next !== composer) {
       if (composer) resizeObserver?.unobserve(composer);
       composer = next;
@@ -281,23 +285,42 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     return visibleRect(composer);
   }
 
+  function conversationActive(element) {
+    // DSH keeps the composer in other views and pins Chat as the first tab.
+    // Use the nearest conversation tab row, without depending on translated labels.
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      const tabs = parent.querySelector('[data-conversation-tabs]');
+      if (tabs) return tabs.querySelector('[role="tab"]')?.getAttribute('aria-selected') === 'true';
+    }
+    // New conversations and the standalone preview have no tab row.
+    return true;
+  }
+
   function positionPanel() {
     if (panel.hidden || !box) return;
     const view = viewport();
     panel.style.maxHeight = `${Math.max(60, view.height - 16)}px`;
     const width = panel.offsetWidth;
     const height = panel.offsetHeight;
-    const x = model.clamp(box.x + box.width - width, view.left + 8,
+    const x = model.clamp(panelPosition?.x ?? box.x + box.width - width, view.left + 8,
       Math.max(view.left + 8, view.left + view.width - width - 8));
-    const y = model.clamp(box.y - height - 8, view.top + 8,
+    const y = model.clamp(panelPosition?.y ?? box.y - height - 8, view.top + 8,
       Math.max(view.top + 8, view.top + view.height - height - 8));
+    if (panelPosition) panelPosition = { x, y };
     panel.style.left = `${x - box.x}px`;
     panel.style.top = `${y - box.y}px`;
   }
 
   function place() {
-    if (disposed || drag || detached) return;
+    if (disposed) return;
     const rect = locateComposer();
+    // Only a visible composer belonging to the active Chat view can host the pet.
+    const hidden = detached || !rect;
+    if (host.hidden !== hidden) {
+      host.hidden = hidden;
+      if (hidden) { resetInput(); closePanel(); endDrag(true); }
+    }
+    if (hidden || drag) return;
     box = model.placement(settings, viewport(), rect);
     host.style.width = `${box.width}px`;
     host.style.height = `${box.height}px`;
@@ -317,7 +340,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
 
   function animate(now) {
     frame = 0;
-    if (disposed || document.hidden) return;
+    if (disposed || document.hidden || host.hidden) return;
     const moving = animation.advance(lastFrame === null ? 1 / 60 : (now - lastFrame) / 1000);
     lastFrame = now;
     render();
@@ -328,7 +351,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   function apply(feedback) {
     animation.apply(feedback);
     if (motionPreference.matches) render();
-    else if (!frame && !document.hidden && !disposed) frame = win.requestAnimationFrame(animate);
+    else if (!frame && !document.hidden && !host.hidden && !disposed) frame = win.requestAnimationFrame(animate);
   }
 
   function resetInput() {
@@ -341,6 +364,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   }
 
   function closePanel(restore = false) {
+    endPanelDrag();
     if (panel.hidden) return;
     panel.hidden = true;
     pet.setAttribute('aria-expanded', 'false');
@@ -349,6 +373,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   }
 
   function openPanel(refreshDesktop = true) {
+    if (disposed || host.hidden) return;
     resetInput();
     restoreFocus = document.activeElement === host ? pet : document.activeElement;
     panel.hidden = false;
@@ -381,6 +406,32 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     }
     place();
   }
+
+  function endPanelDrag() {
+    if (!panelDrag) return;
+    const { id } = panelDrag;
+    panelDrag = null;
+    if (panelHeading.hasPointerCapture(id)) panelHeading.releasePointerCapture(id);
+  }
+
+  on(panelHeading, 'pointerdown', event => {
+    if (event.button !== 0 || !event.isPrimary || event.target.closest('button')) return;
+    const rect = panel.getBoundingClientRect();
+    panelDrag = { id: event.pointerId, startX: event.clientX, startY: event.clientY, x: rect.left, y: rect.top };
+    panelHeading.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  on(panelHeading, 'pointermove', event => {
+    if (!panelDrag || event.pointerId !== panelDrag.id) return;
+    panelPosition = {
+      x: panelDrag.x + event.clientX - panelDrag.startX,
+      y: panelDrag.y + event.clientY - panelDrag.startY,
+    };
+    positionPanel();
+  });
+  on(panelHeading, 'pointerup', event => { if (event.pointerId === panelDrag?.id) endPanelDrag(); });
+  on(panelHeading, 'pointercancel', endPanelDrag);
+  on(panelHeading, 'lostpointercapture', endPanelDrag);
 
   on(pet, 'pointerdown', event => {
     if (event.button !== 0 || !event.isPrimary || !box) return;
@@ -459,7 +510,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   });
   on(desktopButton, 'click', () => { void detachToDesktop(); });
   on(win, 'keydown', event => {
-    if (!event.isTrusted || document.hidden || detached || detachPending || settings.paused || !panel.hidden || ownEvent(event) || passwordEvent(event)) return;
+    if (!event.isTrusted || document.hidden || host.hidden || detachPending || settings.paused || !panel.hidden || ownEvent(event) || passwordEvent(event)) return;
     if (event.metaKey || ((event.ctrlKey || event.altKey) && !event.getModifierState('AltGraph'))) {
       resetInput();
       return;
@@ -469,7 +520,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   // Always accept releases, including while a shortcut modifier is held.
   on(win, 'keyup', event => { if (state.held.has(event.code)) apply(state.release(event.code)); }, { capture: true });
   on(win, 'blur', () => { resetInput(); endDrag(true); closePanel(); });
-  on(win, 'pagehide', () => { resetInput(); endDrag(true); });
+  on(win, 'pagehide', () => { resetInput(); endDrag(true); endPanelDrag(); });
   on(win, 'pageshow', schedulePlace);
   on(win, 'focus', () => { void checkDesktop(); });
   on(document, 'visibilitychange', () => {
@@ -483,7 +534,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     } else { schedulePlace(); void checkDesktop(); }
   });
   on(motionPreference, 'change', resetInput);
-  on(win, 'resize', () => { endDrag(true); schedulePlace(); });
+  on(win, 'resize', () => { endDrag(true); endPanelDrag(); schedulePlace(); });
   on(document, 'scroll', schedulePlace, { capture: true, passive: true });
   on(document, 'focusin', schedulePlace);
   on(document, 'transitionend', schedulePlace, { capture: true });
@@ -510,13 +561,14 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     document.body.append(host);
     resizeObserver = new win.ResizeObserver(schedulePlace);
     resizeObserver.observe(document.documentElement);
+    resizeObserver.observe(panel);
     mutationObserver = new win.MutationObserver(records => {
       // Ignore our own positioning writes and avoid an observer/repaint loop.
       if (records.some(record => record.target !== host && !host.contains(record.target))) schedulePlace();
     });
     mutationObserver.observe(document.body, {
       subtree: true, childList: true, attributes: true,
-      attributeFilter: ['hidden', 'inert', 'aria-hidden', 'class', 'style', 'data-composer-card'],
+      attributeFilter: ['hidden', 'inert', 'aria-hidden', 'aria-selected', 'class', 'style', 'data-composer-card'],
     });
     syncSettings(); place(); render();
     void checkDesktop();
@@ -528,6 +580,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     events.abort();
     resetInput();
     endDrag(true);
+    endPanelDrag();
     if (layoutFrame) win.cancelAnimationFrame(layoutFrame);
     resizeObserver?.disconnect();
     mutationObserver?.disconnect();

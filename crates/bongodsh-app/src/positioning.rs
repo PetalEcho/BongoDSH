@@ -12,6 +12,7 @@ pub(crate) struct WindowId {
 pub(crate) struct TargetWindow {
     pub id: WindowId,
     pub bounds: Rect,
+    pub maximized: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -25,6 +26,19 @@ pub(crate) struct Widget {
     pub outer: Rect,
     pub content: Rect,
     pub scale: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Highlight {
+    Corner {
+        corner: Pos2,
+        inward: Vec2,
+        lengths: Vec2,
+    },
+    Edge {
+        start: Pos2,
+        end: Pos2,
+    },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -66,12 +80,118 @@ pub(crate) struct Placement {
 }
 
 impl Placement {
+    pub fn target(&self) -> Option<WindowId> {
+        self.anchor.map(|anchor| anchor.window)
+    }
+
     pub fn attached(&self) -> bool {
         self.anchor.is_some()
     }
 
     pub fn detach(&mut self) {
         self.anchor = None;
+    }
+
+    pub fn highlight(
+        &self,
+        widget: Widget,
+        windows: &[TargetWindow],
+        monitors: &[Monitor],
+    ) -> Option<Highlight> {
+        let anchor = self.anchor?;
+        let target = windows.iter().find(|target| target.id == anchor.window)?;
+        // Keep maximized/fullscreen windows in the occlusion list, but never decorate them.
+        // macOS exposes other apps' geometry without requiring Accessibility permission.
+        if anchor.inside
+            || target.maximized
+            || monitors.iter().any(|monitor| {
+                [monitor.bounds, monitor.work_area]
+                    .into_iter()
+                    .any(|area| target.bounds.contains_rect(area.shrink(2.0 * widget.scale)))
+            })
+            || widget.outer.intersect(target.bounds).is_positive()
+        {
+            return None;
+        }
+        let target = target.bounds;
+        let (gap, start, end, near, far) = match anchor.edge {
+            Edge::Top => (
+                target.top() - widget.outer.bottom(),
+                target.left_top(),
+                target.right_top(),
+                widget.outer.left(),
+                widget.outer.right(),
+            ),
+            Edge::Bottom => (
+                widget.outer.top() - target.bottom(),
+                target.left_bottom(),
+                target.right_bottom(),
+                widget.outer.left(),
+                widget.outer.right(),
+            ),
+            Edge::Left => (
+                target.left() - widget.outer.right(),
+                target.left_top(),
+                target.left_bottom(),
+                widget.outer.top(),
+                widget.outer.bottom(),
+            ),
+            Edge::Right => (
+                widget.outer.left() - target.right(),
+                target.right_top(),
+                target.right_bottom(),
+                widget.outer.top(),
+                widget.outer.bottom(),
+            ),
+        };
+        let horizontal = matches!(anchor.edge, Edge::Top | Edge::Bottom);
+        let edge_start = if horizontal { start.x } else { start.y };
+        let edge_end = if horizontal { end.x } else { end.y };
+        let threshold = 32.0 * widget.scale;
+        if !(0.0..=threshold).contains(&gap)
+            || far < edge_start - threshold
+            || near > edge_end + threshold
+        {
+            return None;
+        }
+        let start_distance = (edge_start - far).max(near - edge_start).max(0.0);
+        let end_distance = (edge_end - far).max(near - edge_end).max(0.0);
+        if start_distance.min(end_distance) > threshold {
+            let center = ((near + far) * 0.5).clamp(edge_start, edge_end);
+            let half_length = ((far - near) * 0.5).clamp(40.0 * widget.scale, 90.0 * widget.scale);
+            let from = (center - half_length).max(edge_start + 12.0 * widget.scale);
+            let to = (center + half_length).min(edge_end - 12.0 * widget.scale);
+            return Some(Highlight::Edge {
+                start: if horizontal {
+                    pos2(from, start.y)
+                } else {
+                    pos2(start.x, from)
+                },
+                end: if horizontal {
+                    pos2(to, start.y)
+                } else {
+                    pos2(start.x, to)
+                },
+            });
+        }
+        let corner = if start_distance <= end_distance {
+            start
+        } else {
+            end
+        };
+        let right = corner.x == target.right();
+        let bottom = corner.y == target.bottom();
+        Some(Highlight::Corner {
+            corner,
+            inward: Vec2::new(
+                if right { -1.0 } else { 1.0 },
+                if bottom { -1.0 } else { 1.0 },
+            ),
+            lengths: Vec2::new(
+                (target.width() * 0.5).min(180.0 * widget.scale),
+                (target.height() * 0.5).min(110.0 * widget.scale),
+            ),
+        })
     }
 
     pub fn snap(&mut self, widget: Widget, windows: &[TargetWindow]) -> Option<Pos2> {
@@ -161,4 +281,20 @@ fn fraction(value: f32, start: f32, span: f32) -> f32 {
     } else {
         0.0
     }
+}
+
+/// Match public accessibility geometry to one native window, never just its app.
+#[cfg(target_os = "macos")]
+pub(crate) fn identify_focused_window(
+    process: u32,
+    bounds: Rect,
+    windows: &[TargetWindow],
+) -> Option<WindowId> {
+    let mut matching = windows.iter().filter(|window| {
+        window.id.process == process
+            && (window.bounds.min - bounds.min).abs().max_elem() <= 1.0
+            && (window.bounds.max - bounds.max).abs().max_elem() <= 1.0
+    });
+    let window = matching.next()?;
+    matching.next().is_none().then_some(window.id)
 }
