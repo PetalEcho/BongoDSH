@@ -1,8 +1,8 @@
 # 角色上色记录
 
-日期：2026-11-03，Asia/Singapore。用户要求将现有线稿全部上色，包括六张角色身体和三套换装共用的椭圆手形。彩色版本使用 `-colored.png` 后缀，原线稿保留。
+日期：2026-11-03，Asia/Singapore。首次上色包括六张角色身体和三套换装共用的椭圆手形。随后按用户要求，为六个角色各自制作配套手部，替换三套换装的通用彩手，并补齐另外三款的左右手。彩色版本使用 `-colored.png` 后缀，原线稿保留。
 
-本轮只使用内置 imagegen。每次以上一轮线稿为造型依据，配色参考只决定颜色，不恢复参考图中的坐姿、食物、双手或场景。身体与手分别保存为独立 PNG，没有键盘。
+首次上色只使用内置 imagegen。每次以上一轮线稿为造型依据，配色参考只决定颜色，不恢复参考图中的坐姿、食物、双手或场景。身体与手分别保存为独立 PNG，没有键盘。
 
 ## 文件与配色
 
@@ -15,25 +15,28 @@
 | 长发蓝女仆 | [blue-maid-prone-colored.png](../assets/concepts/blue-maid-prone-colored.png) | 按用户附件采用深蓝到亮蓝的长发、深蓝女仆服、白围裙与荷叶边、青蓝蝴蝶结 |
 | 橙发礼服少女 | [orange-bride-prone-colored.png](../assets/concepts/orange-bride-prone-colored.png) | 按用户附件采用铜橙长发、象牙白礼服和头纱、深色束腰、暖金花饰与琥珀色眼睛 |
 
-通用手形保持横向椭圆、深色轮廓和白色填充，只有少量浅冷灰阴影。一个生成结果原样复制为三套装扮的左右手，因此六张手部文件一致。
+当前手部按各角色的服装区分袖口、肤色或手套颜色，以及描线细节。每款使用一张对称手形，原样复制为左右两个独立文件；六款造型各不相同。配色说明、验证结果和实际提示词见[角色配套手部](character-hands.md)。
 
 | 装扮 | 左手 | 右手 |
 | --- | --- | --- |
 | 水手 | [left-hand-colored.png](../assets/characters/sailor/left-hand-colored.png) | [right-hand-colored.png](../assets/characters/sailor/right-hand-colored.png) |
 | 睡衣 | [left-hand-colored.png](../assets/characters/pajamas/left-hand-colored.png) | [right-hand-colored.png](../assets/characters/pajamas/right-hand-colored.png) |
 | 魔法师 | [left-hand-colored.png](../assets/characters/wizard/left-hand-colored.png) | [right-hand-colored.png](../assets/characters/wizard/right-hand-colored.png) |
+| 基础女仆鱼 | [fish-maid-left-hand-colored.png](../assets/concepts/fish-maid-left-hand-colored.png) | [fish-maid-right-hand-colored.png](../assets/concepts/fish-maid-right-hand-colored.png) |
+| 长发蓝女仆 | [blue-maid-prone-left-hand-colored.png](../assets/concepts/blue-maid-prone-left-hand-colored.png) | [blue-maid-prone-right-hand-colored.png](../assets/concepts/blue-maid-prone-right-hand-colored.png) |
+| 橙发礼服少女 | [orange-bride-prone-left-hand-colored.png](../assets/concepts/orange-bride-prone-left-hand-colored.png) | [orange-bride-prone-right-hand-colored.png](../assets/concepts/orange-bride-prone-right-hand-colored.png) |
 
 ## 来源与使用范围
 
-基础鱼娘及换装的蓝白配色参考用户指定的上游 `body.png`，来源记录见[大肥鱼线稿与提示词](image-generation.md)。手形来自此前已确认的独立椭圆线稿。
+基础鱼娘及换装的蓝白配色参考用户指定的上游 `body.png`，来源记录见[大肥鱼线稿与提示词](image-generation.md)。手部在此前独立椭圆手形的基础上，按各自身体的配色与服装细节重新生成。
 
 两张附件角色分别参考 `ba63bd6cb0f40d4a8d1491ffd1e90a5e.png` 和 `6c064d0b389f8c352f501a89fe4bd825.png` 的颜色，原附件没有复制进仓库。线稿提示词见[趴窝角色记录](prone-lineart-drafts.md)。
 
 这些文件是角色素材，本轮没有改动 Rust 源码或内置角色登记。生成记录不改变原始角色和参考图片的许可。
 
-## 检查
+## 首轮上色检查
 
-六张身体和一个通用手形共进行九次内置生成或定向编辑。蓝发女仆上色后恢复了原线稿的小闭口笑；水手版进行了一次透明通道清理。所有输出只做原样复制，没有使用程序修改像素。
+首轮六张身体和一个通用手形共进行九次内置生成或定向编辑。蓝发女仆上色后恢复了原线稿的小闭口笑；水手版进行了一次透明通道清理。所有输出只做原样复制，没有使用程序修改像素。后续六款手部的生成与检查另见[配套手部记录](character-hands.md)。
 
 | 素材 | 像素尺寸 |
 | --- | --- |
@@ -43,15 +46,15 @@
 | 魔法师装 | 1613 × 975 |
 | 长发蓝女仆 | 1721 × 914 |
 | 橙发礼服少女 | 1774 × 887 |
-| 通用手形 | 1374 × 1145 |
+| 初版通用手形，彩色版已替换 | 1374 × 1145 |
 
-所有彩稿均为 8 位 RGBA PNG。逐一检查了完整造型、填色区域、身体无手以及透明背景，并只读核验尺寸、透明通道和文件复制一致性。三套左右手的六份文件具有相同 SHA-256。原线稿均未修改。基础鱼娘彩稿比线稿窄 1 像素，其余输出保持原画布尺寸。
+首轮所有彩稿均为 8 位 RGBA PNG。逐一检查了完整造型、填色区域、身体无手以及透明背景，并只读核验尺寸、透明通道和文件复制一致性。首轮通用手的六份副本当时具有相同 SHA-256，现已替换为各款独立设计。原线稿均未修改。基础鱼娘彩稿比线稿窄 1 像素，其余输出保持原画布尺寸。
 
 部分内置输出的实色区 alpha 为 253 或 254，属于接近不透明的生成结果。工具缩略图曾显示水手版透明像素中隐藏的棕色 RGB；在 macOS 预览中检查最终 PNG，轮廓外没有可见光晕。
 
 本轮只增加图片和更新文档，未修改 Rust 源码，因此未重跑 Rust 测试。检查范围为素材和文档，不代表验证了程序运行时的角色装配。
 
-## 实际上色提示词
+## 首轮实际上色提示词
 
 六张身体首次上色均以对应线稿作为图 1。基础鱼娘及换装以原始 `body.png` 作为图 2；两张附件角色以各自原图作为图 2。后续修正以各自的彩稿为编辑目标。手部只使用一张已确认的椭圆线稿。
 
@@ -132,7 +135,7 @@ The approved Image 1 must remain a fully clothed human chibi resting flat on her
 Fill the character's material regions with color, while preserving genuine transparent alpha outside her silhouette and in true gaps between hair strands, lace and clothing. Keep the entire character visible with the existing transparent safety margin. No white or colored background, checkerboard pattern, ground, cast shadow outside the character, buildings, people, cursor, keyboard, desk, text, labels, border, watermark or extra objects. Exactly one separate colored BODY PNG.
 ```
 
-### 通用独立手形
+### 通用独立手形，历史版本
 
 ```text
 Use case: precise-object-edit.
