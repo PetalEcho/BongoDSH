@@ -2,19 +2,23 @@
 
 一个陪你打字的小挂件。敲键时双手拍下、身体轻轻回弹；可以贴在 DSH 输入框上沿，也可以拖到桌面，吸附在其他程序的窗口边缘。
 
-当前源码内置五款彩色角色，预览如下。角色移除与更名尚未发布，下面的 0.2.5 安装包仍使用旧角色列表。双手在运行时独立叠加，不带键盘图形。
+当前源码的桌面版和插件版共用以下五款角色。水手鱼、睡衣鱼和魔法师鱼已按基础大肥鱼重绘，统一为长发、闭眼微笑和低趴造型。点击预览可查看当前身体原图；双手在运行时独立叠加，不带键盘图形。
+
+这些角色调整尚未发布，下面的 0.2.5 安装包仍使用旧角色列表和素材。
 
 <table>
   <tr>
-    <td align="center"><img src="assets/concepts/blue-maid-prone-colored.png" width="160" alt="基础大肥鱼"><br>基础大肥鱼</td>
-    <td align="center"><img src="assets/characters/sailor/body-colored.png" width="160" alt="水手鱼"><br>水手鱼</td>
-    <td align="center"><img src="assets/characters/pajamas/body-colored.png" width="160" alt="睡衣鱼"><br>睡衣鱼</td>
+    <td align="center"><a href="assets/concepts/blue-maid-prone-colored.png"><img src="assets/concepts/blue-maid-prone-colored.png" width="160" alt="基础大肥鱼"></a><br>基础大肥鱼</td>
+    <td align="center"><a href="assets/characters/sailor/body-colored.png"><img src="assets/characters/sailor/body-colored.png" width="160" alt="水手鱼"></a><br>水手鱼</td>
+    <td align="center"><a href="assets/characters/pajamas/body-colored.png"><img src="assets/characters/pajamas/body-colored.png" width="160" alt="睡衣鱼"></a><br>睡衣鱼</td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/characters/wizard/body-colored.png" width="160" alt="魔法师鱼"><br>魔法师鱼</td>
-    <td align="center"><img src="assets/concepts/orange-bride-prone-colored.png" width="160" alt="克劳德"><br>克劳德</td>
+    <td align="center"><a href="assets/characters/wizard/body-colored.png"><img src="assets/characters/wizard/body-colored.png" width="160" alt="魔法师鱼"></a><br>魔法师鱼</td>
+    <td align="center"><a href="assets/concepts/orange-bride-prone-colored.png"><img src="assets/concepts/orange-bride-prone-colored.png" width="160" alt="克劳德"></a><br>克劳德</td>
   </tr>
 </table>
+
+图片直接引用仓库 `assets/` 中的当前彩稿。桌面版通过 [Rust 素材映射](crates/bongodsh-app/src/sprites.rs) 内嵌，插件版通过 [角色配置](plugins/dsh-bongodsh/src/characters.js) 打包为 `client.js`；两端使用相同的身体和独立双手。具体文件见 [素材清单](plugins/dsh-bongodsh/ASSETS.md)。
 
 ## 安装
 
@@ -24,11 +28,11 @@
 2. 在 DSH「插件 → 添加插件」中粘贴链接，安装后启用。
 3. 重启对应的 DSH 实例并刷新页面。升级后也需要这一步。
 
-| 平台 | 安装包 |
-| --- | --- |
+| 平台                | 安装包                                                                                                                                   |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | macOS Apple Silicon | [dsh-bongodsh-0.2.5-darwin-arm64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-arm64.tgz) |
-| macOS Intel | [dsh-bongodsh-0.2.5-darwin-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-x64.tgz) |
-| Windows x64 | [dsh-bongodsh-0.2.5-win32-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-win32-x64.tgz) |
+| macOS Intel         | [dsh-bongodsh-0.2.5-darwin-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-x64.tgz)     |
+| Windows x64         | [dsh-bongodsh-0.2.5-win32-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-win32-x64.tgz)       |
 
 各平台安装包都包含页面插件、全部角色素材和桌面程序，无需安装 Rust，也无需先下载再本地导入。
 
@@ -39,8 +43,6 @@ dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/down
 ```
 
 其他平台替换为表中对应链接。`web` 是 profile 名称，按自己的 DSH 实例调整。
-
-macOS 包尚未经过 Developer ID 签名和公证。macOS Apple Silicon 已完成实机验证；Intel Mac 和 Windows x64 的界面尚未实机验证。
 
 ## 功能
 
@@ -56,24 +58,24 @@ macOS 包尚未经过 Developer ID 签名和公证。macOS Apple Silicon 已完�
 
 页面中点击或右键角色打开设置；桌面上右键打开。按 Escape 收起面板。页面也支持用 Tab 聚焦角色、Enter 打开设置。
 
-| 想做什么 | 操作 |
-| --- | --- |
-| 换个角色 | 在设置中选择角色 |
-| 调整大小 | 拖动「角色大小」滑块，范围为 100–220 px |
-| 调整动作 | 分别设置「手部幅度」和「身体幅度」，范围为 0–200%；0% 关闭对应部位的动作 |
-| 暂时停下 | 开启「暂停动作」 |
-| 贴住输入框 | 开启「跟随输入框」；找不到输入框时会退回页面边缘 |
-| 移到桌面 | 将角色拖出 DSH 窗口，或点击「移到桌面」 |
-| 贴住其他窗口 | 在桌面模式开启「吸附窗口」，再将角色拖近窗口边缘 |
-| 回到页面 | 点击「返回 DSH」 |
-| 恢复位置 | 点击「恢复位置」；页面回到默认位置，桌面回到本轮拖出的起点 |
-| 响应其他程序的按键 | 展开「桌面选项」，开启「全局键盘」 |
+| 想做什么           | 操作                                                                      |
+| ------------------ | ------------------------------------------------------------------------- |
+| 换个角色           | 在设置中选择角色                                                          |
+| 调整大小           | 拖动「角色大小」滑块，范围为 100–220 px                                  |
+| 调整动作           | 分别设置「手部幅度」和「身体幅度」，范围为 0–200%；0% 关闭对应部位的动作 |
+| 暂时停下           | 开启「暂停动作」                                                          |
+| 贴住输入框         | 开启「跟随输入框」；找不到输入框时会退回页面边缘                          |
+| 移到桌面           | 将角色拖出 DSH 窗口，或点击「移到桌面」                                   |
+| 贴住其他窗口       | 在桌面模式开启「吸附窗口」，再将角色拖近窗口边缘                          |
+| 回到页面           | 点击「返回 DSH」                                                          |
+| 恢复位置           | 点击「恢复位置」；页面回到默认位置，桌面回到本轮拖出的起点                |
+| 响应其他程序的按键 | 展开「桌面选项」，开启「全局键盘」                                        |
 
 ### 全局键盘与隐私
 
 首次使用默认只响应窗口内输入。「全局键盘」需要手动开启，macOS 还需要授予系统输入监控权限。选择会保存在本机，重启或再次拖出后恢复，但不会自动申请系统权限。
 
-缺少权限或监听失败时暂用窗口输入，系统限制期间暂停全局反馈；设置面板会显示原因，并保留原有选择。具体权限和排查步骤见 [全局键盘说明](docs/global-keyboard.md)。
+缺少权限或监听失败时暂用窗口输入，系统限制期间暂停全局反馈；设置面板会显示原因，并保留原有选择。
 
 只处理物理按键，不读取、记录或上传输入文字。页面模式只响应当前页面，密码框和 Ctrl / Command / Alt 快捷键不触发动作。桌面吸附依据窗口位置和尺寸，不识别其他程序的输入框。
 
@@ -87,13 +89,13 @@ macOS 包尚未经过 Developer ID 签名和公证。macOS Apple Silicon 已完�
 - Node.js **22.19+**，插件无需 `npm install`。
 - macOS 需要 Xcode Command Line Tools；Windows 需要 MSVC 工具链和 Visual Studio C++ Build Tools。
 
-在仓库根目录启动独立桌面原型：
+在仓库根目录启动独立桌面版：
 
 ```sh
 cargo run --locked --bin bongodsh
 ```
 
-独立启动显示矢量鲸鱼原型，DSH 插件使用五款 PNG 角色。插件的本地安装、构建与预览见 [插件开发说明](plugins/dsh-bongodsh/README.md)。
+独立启动默认显示基础大肥鱼，右键可切换五款角色、调整大小和动作幅度，点击「退出挂件」关闭。它与 DSH 页面和拖出的桌面角色共用同一套 PNG；独立启动的角色设置仅在本次运行有效，键盘输入模式会保存在本机。插件的本地安装、构建与预览见 [插件开发说明](plugins/dsh-bongodsh/README.md)。
 
 提交前检查 Rust 工程：
 
@@ -115,15 +117,14 @@ npm run release
 
 ### 项目结构
 
-| 目录 | 内容 |
-| --- | --- |
-| `crates/bongodsh-core/` | 平台无关的输入状态机和动作规则 |
-| `crates/bongodsh-app/` | 桌面窗口、角色绘制和系统输入适配 |
-| `plugins/dsh-bongodsh/` | DSH 插件、客户端源码和打包脚本 |
-| `assets/` | 角色身体、双手彩稿及历史线稿 |
-| `docs/` | 桥接协议、平台边界和验证记录 |
+| 目录                      | 内容                             |
+| ------------------------- | -------------------------------- |
+| `crates/bongodsh-core/` | 平台无关的输入状态机和动作规则   |
+| `crates/bongodsh-app/`  | 桌面窗口、角色绘制和系统输入适配 |
+| `plugins/dsh-bongodsh/` | DSH 插件、客户端源码和打包脚本   |
+| `assets/`               | 角色身体、双手彩稿及历史线稿     |
+| `docs/`                 | 桥接协议、平台边界和验证记录     |
 
-macOS Apple Silicon 已验证页面显示、拖出、设置同步及全局键盘偏好恢复。详见 [插件验证记录](docs/plugin-validation.md) 和 [桌面桥接](docs/desktop-bridge.md)。本地回归用例位于忽略的测试目录，新克隆的仓库不含这些用例，CI 的 `cargo test` 不代表同等回归覆盖。
 
 ## 更新记录
 
@@ -132,7 +133,5 @@ macOS Apple Silicon 已验证页面显示、拖出、设置同步及全局键盘
 ## 参考与许可
 
 项目原创代码、脚本、配置和文档文字采用 [MIT 许可证](LICENSE)，允许修改、分发和商业使用，须保留版权与许可声明。第三方依赖沿用各自许可证。
-
-角色图片单独处理，不包含在 MIT 授权中，包括 `assets/` 中的 PNG、`client.js` 内嵌的图片数据和桌面二进制中的角色美术。素材基于用户指定参考图和附件生成，当前未确认完整再授权范围，不因代码开源而获得额外使用或再分发许可。详见 [素材许可边界](assets/LICENSE.txt) 和 [来源说明](plugins/dsh-bongodsh/ASSETS.md)。
 
 交互参考 [dsh-bongo-fish](https://github.com/YUsaltyfish/dsh-bongo-fish) 和 [dsh-whale-bongo](https://github.com/MeteorNOX/dsh-whale-bongo)，未复制其代码或音效。

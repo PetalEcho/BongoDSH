@@ -1,6 +1,8 @@
 # BongoDSH DSH 插件
 
-五款彩色打字角色，可贴在 DSH 输入框上沿，也可拖出为桌面挂件。已发布版本 0.2.5；当前源码的角色移除与更名尚未发布。
+五款彩色打字角色，可贴在 DSH 输入框上沿，也可拖出为桌面挂件。已发布版本 0.2.5；当前源码的角色移除、更名和三款换装重绘尚未发布。
+
+最新角色预览见 [项目 README](https://github.com/PetalEcho/BongoDSH/blob/main/README.md)。页面插件、拖出的桌面窗口和独立桌面版均引用根目录 `assets/` 中的同一套身体与双手；源码文件对应关系见 [素材清单](ASSETS.md)。
 
 原创代码采用 [MIT 许可证](LICENSE)。角色美术及内嵌图片不在 MIT 授权范围内，来源与使用边界见 [ASSETS.md](ASSETS.md)。
 
@@ -91,4 +93,4 @@ npm run release
 
 ## 素材
 
-未复制参考项目的代码或音效。角色由用户指定参考图和附件生成，不能仅依据参考项目的代码许可证判断素材许可。详见随包的 [ASSETS.md](ASSETS.md)。项目许可证尚未确定，包声明为 `UNLICENSED` 和 `private`。
+未复制参考项目的代码或音效。角色由用户指定参考图和附件生成，不能仅依据参考项目的代码许可证判断素材许可。详见随包的 [ASSETS.md](ASSETS.md)。原创代码采用 MIT，包声明为 `SEE LICENSE IN LICENSE` 和 `private`，角色图片及内嵌形式的许可单独说明。

@@ -263,11 +263,13 @@ impl Desktop {
             self.docking.restore_initial();
             ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
         }
+        let close_label = if self.parent.is_some() {
+            self.text("返回 DSH", "Return to DSH")
+        } else {
+            self.text("退出挂件", "Quit BongoDSH")
+        };
         if ui
-            .add_sized(
-                [ui.available_width(), 30.0],
-                egui::Button::new(self.text("返回 DSH", "Return to DSH")),
-            )
+            .add_sized([ui.available_width(), 30.0], egui::Button::new(close_label))
             .clicked()
         {
             ui.ctx()

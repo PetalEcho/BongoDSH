@@ -21,9 +21,8 @@ mod controls;
 mod settings;
 
 pub(crate) fn run(launch: Option<Launch>) -> eframe::Result {
-    let size = launch.map_or([300.0, 270.0], |launch| {
-        [launch.size, launch.size * 252.0 / 300.0]
-    });
+    let width = launch.map_or(160.0, |launch| launch.size);
+    let size = [width, width * 252.0 / 300.0];
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("BongoDSH")
@@ -83,10 +82,8 @@ impl Desktop {
         launch: Option<Launch>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let ctx = &creation.egui_ctx;
-        let artwork = launch
-            .map(|launch| Artwork::load(ctx, launch.character))
-            .transpose()
-            .map_err(std::io::Error::other)?;
+        let character = launch.map_or(0, |launch| launch.character);
+        let artwork = Some(Artwork::load(ctx, character).map_err(std::io::Error::other)?);
         let docking = Docking::new(creation, launch.map(|launch| launch.grab));
         if launch.is_some() && !docking.available() {
             return Err(std::io::Error::other("当前平台无法接续桌面拖动。").into());
@@ -127,7 +124,7 @@ impl Desktop {
             docking,
             parent,
             ready: false,
-            character: launch.map_or(0, |launch| launch.character),
+            character,
             character_size: launch.map_or(160.0, |launch| launch.size),
             hand_amplitude: launch.map_or(100, |launch| launch.hand_amplitude),
             body_amplitude: launch.map_or(100, |launch| launch.body_amplitude),
@@ -418,8 +415,7 @@ impl eframe::App for Desktop {
             return;
         }
         let now = Instant::now();
-        let settings_active =
-            self.parent.is_some() && (self.desktop_settings_open || self.keyboard_settings_open);
+        let settings_active = self.desktop_settings_open || self.keyboard_settings_open;
         let events = self.global.poll();
         if !settings_active && !self.paused {
             for event in events {
