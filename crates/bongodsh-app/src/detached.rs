@@ -54,14 +54,8 @@ impl Settings {
     }
 }
 
-pub(crate) const CHARACTER_IDS: [&str; 6] = [
-    "fish-maid",
-    "sailor",
-    "pajamas",
-    "wizard",
-    "blue-maid",
-    "orange-bride",
-];
+pub(crate) const CHARACTER_IDS: [&str; 5] =
+    ["blue-maid", "sailor", "pajamas", "wizard", "orange-bride"];
 
 impl Launch {
     pub fn parse(arguments: &[OsString]) -> Result<Self, &'static str> {

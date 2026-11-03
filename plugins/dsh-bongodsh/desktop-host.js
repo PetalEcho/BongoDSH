@@ -4,7 +4,7 @@ import { constants } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-const characterIds = new Set(['fish-maid', 'sailor', 'pajamas', 'wizard', 'blue-maid', 'orange-bride']);
+const characterIds = new Set(['blue-maid', 'sailor', 'pajamas', 'wizard', 'orange-bride']);
 const endpoint = 'bongodsh/desktop';
 
 async function findExecutable() {

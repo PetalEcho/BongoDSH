@@ -8,12 +8,11 @@ use super::{
 };
 use crate::sprites::Artwork;
 
-const LABELS: [(&str, &str); 6] = [
-    ("基础女仆鱼", "Fish maid"),
-    ("水手装", "Sailor"),
-    ("睡衣装", "Pajamas"),
-    ("魔法师装", "Wizard"),
-    ("长发蓝女仆", "Blue maid"),
+const LABELS: [(&str, &str); 5] = [
+    ("基础大肥鱼", "Basic chubby fish"),
+    ("水手鱼", "Sailor fish"),
+    ("睡衣鱼", "Pajama fish"),
+    ("魔法师鱼", "Wizard fish"),
     ("克劳德", "Claude"),
 ];
 

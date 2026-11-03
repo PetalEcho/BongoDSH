@@ -2,17 +2,16 @@
 
 一个陪你打字的小挂件。敲键时双手拍下、身体轻轻回弹；可以贴在 DSH 输入框上沿，也可以拖到桌面，吸附在其他程序的窗口边缘。
 
-内置六款彩色角色，预览如下。双手在运行时独立叠加，不带键盘图形。
+当前源码内置五款彩色角色，预览如下。角色移除与更名尚未发布，下面的 0.2.5 安装包仍使用旧角色列表。双手在运行时独立叠加，不带键盘图形。
 
 <table>
   <tr>
-    <td align="center"><img src="assets/concepts/fish-maid-colored.png" width="160" alt="基础女仆鱼"><br>基础女仆鱼</td>
-    <td align="center"><img src="assets/characters/sailor/body-colored.png" width="160" alt="水手装"><br>水手装</td>
-    <td align="center"><img src="assets/characters/pajamas/body-colored.png" width="160" alt="睡衣装"><br>睡衣装</td>
+    <td align="center"><img src="assets/concepts/blue-maid-prone-colored.png" width="160" alt="基础大肥鱼"><br>基础大肥鱼</td>
+    <td align="center"><img src="assets/characters/sailor/body-colored.png" width="160" alt="水手鱼"><br>水手鱼</td>
+    <td align="center"><img src="assets/characters/pajamas/body-colored.png" width="160" alt="睡衣鱼"><br>睡衣鱼</td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/characters/wizard/body-colored.png" width="160" alt="魔法师装"><br>魔法师装</td>
-    <td align="center"><img src="assets/concepts/blue-maid-prone-colored.png" width="160" alt="长发蓝女仆"><br>长发蓝女仆</td>
+    <td align="center"><img src="assets/characters/wizard/body-colored.png" width="160" alt="魔法师鱼"><br>魔法师鱼</td>
     <td align="center"><img src="assets/concepts/orange-bride-prone-colored.png" width="160" alt="克劳德"><br>克劳德</td>
   </tr>
 </table>
@@ -46,7 +45,7 @@ macOS 包尚未经过 Developer ID 签名和公证。macOS Apple Silicon 已完�
 ## 功能
 
 - 打字反馈：双手随按键动作，身体轻轻回弹；手部和身体的动作幅度可以分别调整。
-- 六款角色：在设置中随时切换，角色大小、暂停状态和动作幅度保存在本机。
+- 五款角色：在设置中随时切换，角色大小、暂停状态和动作幅度保存在本机。
 - 跟随输入框：角色贴近 DSH 输入框上沿，也可以拖动到页面中的其他位置。
 - 桌面模式：拖出 DSH 窗口即可移到桌面，靠近其他窗口边缘时可吸附；支持返回 DSH。
 - 跨应用反馈：主动开启「全局键盘」后，在其他程序中打字也能触发动作，输入模式会在重启后恢复。
@@ -94,7 +93,7 @@ macOS 包尚未经过 Developer ID 签名和公证。macOS Apple Silicon 已完�
 cargo run --locked --bin bongodsh
 ```
 
-独立启动显示矢量鲸鱼原型，DSH 插件使用六款 PNG 角色。插件的本地安装、构建与预览见 [插件开发说明](plugins/dsh-bongodsh/README.md)。
+独立启动显示矢量鲸鱼原型，DSH 插件使用五款 PNG 角色。插件的本地安装、构建与预览见 [插件开发说明](plugins/dsh-bongodsh/README.md)。
 
 提交前检查 Rust 工程：
 
@@ -121,7 +120,7 @@ npm run release
 | `crates/bongodsh-core/` | 平台无关的输入状态机和动作规则 |
 | `crates/bongodsh-app/` | 桌面窗口、角色绘制和系统输入适配 |
 | `plugins/dsh-bongodsh/` | DSH 插件、客户端源码和打包脚本 |
-| `assets/` | 六款角色的身体、双手彩稿及线稿 |
+| `assets/` | 角色身体、双手彩稿及历史线稿 |
 | `docs/` | 桥接协议、平台边界和验证记录 |
 
 macOS Apple Silicon 已验证页面显示、拖出、设置同步及全局键盘偏好恢复。详见 [插件验证记录](docs/plugin-validation.md) 和 [桌面桥接](docs/desktop-bridge.md)。本地回归用例位于忽略的测试目录，新克隆的仓库不含这些用例，CI 的 `cargo test` 不代表同等回归覆盖。
@@ -132,4 +131,8 @@ macOS Apple Silicon 已验证页面显示、拖出、设置同步及全局键盘
 
 ## 参考与许可
 
-交互参考 [dsh-bongo-fish](https://github.com/YUsaltyfish/dsh-bongo-fish) 和 [dsh-whale-bongo](https://github.com/MeteorNOX/dsh-whale-bongo)，未复制其代码或音效。角色素材由用户指定参考图和附件生成。项目许可证尚未确定。
+项目原创代码、脚本、配置和文档文字采用 [MIT 许可证](LICENSE)，允许修改、分发和商业使用，须保留版权与许可声明。第三方依赖沿用各自许可证。
+
+角色图片单独处理，不包含在 MIT 授权中，包括 `assets/` 中的 PNG、`client.js` 内嵌的图片数据和桌面二进制中的角色美术。素材基于用户指定参考图和附件生成，当前未确认完整再授权范围，不因代码开源而获得额外使用或再分发许可。详见 [素材许可边界](assets/LICENSE.txt) 和 [来源说明](plugins/dsh-bongodsh/ASSETS.md)。
+
+交互参考 [dsh-bongo-fish](https://github.com/YUsaltyfish/dsh-bongo-fish) 和 [dsh-whale-bongo](https://github.com/MeteorNOX/dsh-whale-bongo)，未复制其代码或音效。

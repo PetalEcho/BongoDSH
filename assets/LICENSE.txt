@@ -1,0 +1,14 @@
+Character artwork is not covered by the project's MIT code license.
+
+This directory contains character artwork generated or edited from
+user-selected reference images and attachments. The project does not grant
+a blanket license to these images, the referenced characters, or derivative
+artwork, and does not claim ownership of third-party rights.
+
+The same exclusion applies when these images are embedded as data URIs in
+JavaScript, included in native binaries, or displayed in documentation.
+Confirm applicable rights with the relevant rights holders before reuse or
+redistribution. Code licensing does not establish artwork permissions.
+
+See ../docs/dsh-character-assets.md and
+../plugins/dsh-bongodsh/ASSETS.md for provenance and generation records.

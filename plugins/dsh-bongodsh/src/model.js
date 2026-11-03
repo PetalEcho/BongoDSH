@@ -1,5 +1,5 @@
 // Keep this factory self-contained: the dependency-free build embeds it verbatim.
-export function createModel(characterIds = ['fish-maid']) {
+export function createModel(characterIds = ['blue-maid']) {
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const typingCodes = /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Numpad(?:Add|Subtract|Multiply|Divide|Decimal|Enter|Equal)|Space|Enter|Backspace|Tab|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Backquote|Comma|Period|Slash|IntlBackslash|IntlRo|IntlYen)$/;
 

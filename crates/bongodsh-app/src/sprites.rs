@@ -3,11 +3,11 @@ use eframe::egui::{
     self, Color32, ColorImage, Painter, Rect, TextureHandle, TextureOptions, Vec2, pos2, vec2,
 };
 
-const CHARACTERS: [[&[u8]; 3]; 6] = [
+const CHARACTERS: [[&[u8]; 3]; 5] = [
     [
-        include_bytes!("../../../assets/concepts/fish-maid-colored.png"),
-        include_bytes!("../../../assets/concepts/fish-maid-left-hand-colored.png"),
-        include_bytes!("../../../assets/concepts/fish-maid-right-hand-colored.png"),
+        include_bytes!("../../../assets/concepts/blue-maid-prone-colored.png"),
+        include_bytes!("../../../assets/concepts/blue-maid-prone-left-hand-colored.png"),
+        include_bytes!("../../../assets/concepts/blue-maid-prone-right-hand-colored.png"),
     ],
     [
         include_bytes!("../../../assets/characters/sailor/body-colored.png"),
@@ -25,11 +25,6 @@ const CHARACTERS: [[&[u8]; 3]; 6] = [
         include_bytes!("../../../assets/characters/wizard/right-hand-colored.png"),
     ],
     [
-        include_bytes!("../../../assets/concepts/blue-maid-prone-colored.png"),
-        include_bytes!("../../../assets/concepts/blue-maid-prone-left-hand-colored.png"),
-        include_bytes!("../../../assets/concepts/blue-maid-prone-right-hand-colored.png"),
-    ],
-    [
         include_bytes!("../../../assets/concepts/orange-bride-prone-colored.png"),
         include_bytes!("../../../assets/concepts/orange-bride-prone-left-hand-colored.png"),
         include_bytes!("../../../assets/concepts/orange-bride-prone-right-hand-colored.png"),
@@ -37,11 +32,10 @@ const CHARACTERS: [[&[u8]; 3]; 6] = [
 ];
 
 // Keep the same visible-layer geometry as plugins/dsh-bongodsh/src/characters.js.
-const HANDS: [([f32; 2], Vec2); 6] = [
-    ([56.0, 188.0], vec2(36.0, 28.0)),
-    ([74.0, 170.0], vec2(38.0, 29.0)),
-    ([67.0, 173.0], vec2(36.0, 28.0)),
-    ([73.0, 169.0], vec2(37.0, 29.0)),
+const HANDS: [([f32; 2], Vec2); 5] = [
+    ([45.0, 161.0], vec2(34.0, 27.0)),
+    ([45.0, 161.0], vec2(34.0, 27.0)),
+    ([45.0, 161.0], vec2(34.0, 27.0)),
     ([45.0, 161.0], vec2(34.0, 27.0)),
     ([65.0, 147.0], vec2(36.0, 28.0)),
 ];
