@@ -2,7 +2,20 @@
 
 一个陪你打字的小挂件。敲键时双手拍下、身体轻轻回弹；可以贴在 DSH 输入框上沿，也可以拖到桌面，吸附在其他程序的窗口边缘。
 
-内置基础女仆鱼、水手装、睡衣装、魔法师装、长发蓝女仆和克劳德六款彩色角色。身体与双手独立绘制，不带键盘图形。
+内置六款彩色角色，预览如下。双手在运行时独立叠加，不带键盘图形。
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/concepts/fish-maid-colored.png" width="160" alt="基础女仆鱼"><br>基础女仆鱼</td>
+    <td align="center"><img src="assets/characters/sailor/body-colored.png" width="160" alt="水手装"><br>水手装</td>
+    <td align="center"><img src="assets/characters/pajamas/body-colored.png" width="160" alt="睡衣装"><br>睡衣装</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/characters/wizard/body-colored.png" width="160" alt="魔法师装"><br>魔法师装</td>
+    <td align="center"><img src="assets/concepts/blue-maid-prone-colored.png" width="160" alt="长发蓝女仆"><br>长发蓝女仆</td>
+    <td align="center"><img src="assets/concepts/orange-bride-prone-colored.png" width="160" alt="克劳德"><br>克劳德</td>
+  </tr>
+</table>
 
 ## 安装
 
