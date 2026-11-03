@@ -10,6 +10,10 @@ Windows x64 与 Intel Mac 在各自的 GitHub Actions runner 上完成格式检�
 
 Release 仅提供三个平台的完整桌面包。DSH 通过对应附件的 HTTPS 链接安装，操作与链接见 [README](../README.md)。
 
+三个已发布附件的 SHA-256 均与本地核验产物一致。各包版本、平台架构、客户端和十二个 PNG 均已核对；Intel Mac 和 Windows 包相较 CI 原件仅同步最终 README，程序字节不变。包内不含测试、用户设置或其他平台的原生程序。
+
+本机 DSH 已移除原本的本地目录来源，通过 Release 链接安装并启用 0.2.5。重启 DSH 后，确认子进程来自 profile 的 `node_modules/dsh-bongodsh`；魔法师装、160 px、手部与身体 100% 均保留，原生设置自动选中全局键盘并显示已连接。未更改系统权限。
+
 ## 0.2.4
 
 2026-11-03，页面和原生设置文案精简，三条滑块改为 4 px 轨道、约 14 px 圆柄与 24 px 操作区。59 项 Node 回归、27 项 Rust 回归、格式检查、macOS / Windows Clippy、release 构建和命令行模拟通过。
