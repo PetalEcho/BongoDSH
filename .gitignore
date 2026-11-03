@@ -9,3 +9,5 @@
 # 本地回归用例遵循项目约定，不暂存、提交或推送。
 /crates/bongodsh-core/tests/
 /crates/bongodsh-app/tests/
+/plugins/dsh-bongodsh/tests/
+/plugins/dsh-bongodsh/dist/

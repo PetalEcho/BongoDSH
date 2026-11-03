@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BongoDSH 插件预览</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #2a4352; background: #edf4f6; font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 24px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid #c6dbe1; padding-bottom: 16px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 650; } header span { font-size: 12px; color: #59727e; }
+  p { max-width: 50ch; } .intro { margin-top: 28px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+  button { color: #2a4352; background: #f8fcfd; border: 1px solid #b9d1d9; border-radius: 7px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:focus-visible, textarea:focus-visible { outline: 2px solid #27768b; outline-offset: 3px; }
+  .composer { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); width: min(712px, calc(100vw - 48px)); padding: 16px; border: 1px solid #b9d1d9; background: #fff; border-radius: 14px; }
+  textarea { display: block; width: 100%; min-height: 90px; resize: vertical; border: 0; background: transparent; color: #2a4352; font: inherit; outline-offset: 8px; }
+  .footer { display: flex; justify-content: space-between; align-items: center; color: #59727e; font-size: 12px; margin-top: 12px; }
+  #status { font-size: 13px; color: #536b77; }
+  @media (max-width: 480px) { main { padding: 20px 16px; } header { align-items: start; flex-direction: column; gap: 2px; } .composer { bottom: 18px; width: calc(100vw - 32px); } }
+</style>
+<main>
+  <header><h1>BongoDSH 插件预览</h1><span>本地交互演示</span></header>
+  <p class="intro">在下方输入，看看大肥鱼的动作。拖动调整位置，点击或右键切换六个彩色角色。</p>
+  <p>这是独立预览页，使用与安装包相同的客户端脚本。此页不发送消息。</p>
+  <div class="controls">
+    <button id="toggle">隐藏输入框</button><button id="replace">重建输入框</button>
+    <button id="unmount">卸载插件</button><button id="mount">加载插件</button>
+  </div>
+  <p id="status" role="status">插件已加载</p>
+</main>
+<section class="composer" data-composer-card>
+  <textarea aria-label="预览输入框" placeholder="在这里打字试试，也可以长按或同时按住多个键。"></textarea>
+  <div class="footer"><span>只在当前页面响应</span><span>不会发送或保存文字</span></div>
+</section>
+<script>
+  let plugin;
+  let cleanup;
+  window.__ModuleLoader__ = { load(definition) { plugin = definition.factory(); } };
+</script>
+<script src="/client.js"></script>
+<script>
+  function mount() {
+    cleanup?.();
+    plugin.apply({ effect(callback) { cleanup = callback(); } });
+    document.querySelector('#status').textContent = '插件已加载';
+  }
+  mount();
+  document.querySelector('#mount').onclick = mount;
+  document.querySelector('#unmount').onclick = () => {
+    cleanup?.(); cleanup = null;
+    document.querySelector('#status').textContent = '插件已卸载';
+  };
+  document.querySelector('#toggle').onclick = event => {
+    const composer = document.querySelector('[data-composer-card]');
+    composer.hidden = !composer.hidden;
+    event.target.textContent = composer.hidden ? '显示输入框' : '隐藏输入框';
+  };
+  document.querySelector('#replace').onclick = () => {
+    const composer = document.querySelector('[data-composer-card]');
+    const next = composer.cloneNode(true);
+    next.querySelector('textarea').value = '';
+    composer.replaceWith(next);
+  };
+</script>
+</html>

@@ -3,10 +3,10 @@
 ## 产品与范围
 
 - BongoDSH 是使用 Rust 实现的独立桌面打字挂件，目标平台为 macOS 和 Windows。
-- DSH 指参考仓库所使用的 DeepSeek Harness。后续由轻量 DSH 插件传递布局和任务事件，桌面进程可独立运行。
-- 项目基调、分期和平台边界见 `docs/project-baseline.md`。当前已有 egui/eframe 桌面原型与 macOS / Windows 全局键盘适配，默认窗口输入，用户主动开启全局模式。权限与验证边界见 `docs/global-keyboard.md`；DSH 接入仍未实现。
+- DSH 指参考仓库所使用的 DeepSeek Harness。`plugins/dsh-bongodsh/` 提供直接在 DSH 页面显示角色的独立插件；与 Rust 桌面进程传递布局和任务事件的桥接仍待实现。
+- 项目基调、分期和平台边界见 `docs/project-baseline.md`。当前已有 egui/eframe 桌面原型与 macOS / Windows 全局键盘适配，默认窗口输入，用户主动开启全局模式。权限与验证边界见 `docs/global-keyboard.md`；页面插件的安装和兼容边界见 `plugins/dsh-bongodsh/README.md`。
 - 角色小巧、低干扰，主要操作通过右键或托盘进入。设置面板优先展示预览和常用设置，不使用超大标题或口号式 Hero。
-- 用户明确要求角色不配键盘图形。保持角色与双手的独立剪影。
+- 用户明确要求角色不配键盘图形。身体与双手保持独立图层，双手叠放在身体前侧，不在身体下方单独留一排空间。
 
 ## Rust 实现
 
@@ -26,6 +26,14 @@
 - 透明、置顶、点击穿透、多显示器和 DPI 要分别验证两个平台，不以单端编译通过代替运行验证。
 - DSH 输入框位置来自显式桥接协议，不能仅靠桌面窗口位置推断；桥接协议未经验证前不声称支持现有 DSH 客户端。
 - 图片和音效的许可独立记录。参考项目的素材不能仅依据代码 MIT 许可复制进来。
+
+## DSH 页面插件
+
+- 插件使用无生产依赖的 JavaScript，宿主入口仅供 DSH 发现客户端，不启动网络监听或桌面进程。
+- 角色原图和线稿保存在根 `assets/`，来源见 `docs/dsh-character-assets.md`；插件通过 `src/characters.js` 登记彩稿。构建时将 PNG 原样编码并去重，内嵌到 `client.js`，兼容没有资源接口的 DSH 0.2.1-rc.5，不修改原图像素。没有独立手部素材的角色仅做身体动作。
+- 修改 `plugins/dsh-bongodsh/src/` 后运行该目录的 `npm run build` 与 `npm run check`，保留生成的 `client.js`。安装包使用 `files` 白名单，预览和本地测试不打包。
+- 页面坐标仅使用 CSS 像素和显式输入框标记；不宣称支持原生屏幕吸附。插件卸载时清理 DOM、事件、定时器、动画帧和观察器。
+- 插件本地测试放在忽略的 `plugins/dsh-bongodsh/tests/`，同样不得暂存、提交或推送。
 
 ## 验证与 Git
 

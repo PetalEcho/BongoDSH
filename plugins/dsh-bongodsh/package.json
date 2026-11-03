@@ -1,0 +1,43 @@
+{
+  "name": "dsh-bongodsh",
+  "version": "0.1.3",
+  "description": "BongoDSH 大肥鱼打字挂件，六个彩色角色直接显示在 DSH 页面内。",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*": "./locale/*"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale",
+    "README.md",
+    "ASSETS.md"
+  ],
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.1-rc.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node --check index.js && node --check client.js && node scripts/build.mjs --check",
+    "preview": "node scripts/preview.mjs",
+    "prepack": "npm run check"
+  }
+}

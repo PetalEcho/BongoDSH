@@ -1,4 +1,4 @@
-name: Rust checks
+name: Rust and DSH checks
 
 on:
   push:
@@ -32,3 +32,9 @@ jobs:
         run: cargo build --workspace --release --locked
       - name: Simulated input demo
         run: cargo run --release --locked --bin bongodsh -- --demo
+      - name: Check DSH client bundle
+        working-directory: plugins/dsh-bongodsh
+        run: npm run check
+      - name: Check DSH package contents
+        working-directory: plugins/dsh-bongodsh
+        run: npm pack --dry-run
