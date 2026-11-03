@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use eframe::egui::{self, Rect, Vec2};
+use eframe::egui::{self, Pos2, Rect, Vec2};
 use raw_window_handle::HasWindowHandle;
 
 use crate::{
@@ -13,6 +13,8 @@ pub(crate) struct Docking {
     observer: Option<Observer>,
     placement: Placement,
     initial_grab: Option<Vec2>,
+    initial_position: Option<Pos2>,
+    restore_requested: bool,
     following_pointer: Option<Vec2>,
     dragging: bool,
     enabled: bool,
@@ -43,6 +45,8 @@ impl Docking {
             observer,
             placement: Placement::default(),
             initial_grab,
+            initial_position: None,
+            restore_requested: false,
             following_pointer: None,
             dragging: false,
             enabled: true,
@@ -55,6 +59,64 @@ impl Docking {
 
     pub fn available(&self) -> bool {
         self.native.is_some() && self.observer.is_some()
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+        self.placement.detach();
+        self.needs_snap = enabled;
+        self.invalidate_geometry();
+    }
+
+    pub fn invalidate_geometry(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.next_check = Instant::now();
+    }
+
+    pub fn restore_initial(&mut self) {
+        self.restore_requested = self.initial_position.is_some();
+        self.following_pointer = None;
+        self.dragging = false;
+        self.set_enabled(self.available());
+    }
+
+    pub fn status(&self, chinese: bool) -> &'static str {
+        match (self.placement.attached(), self.enabled, chinese) {
+            (true, _, true) => "已吸附窗口，拖动可解除。",
+            (true, _, false) => "Attached to a window. Drag to detach.",
+            (false, true, true) => "拖近其他窗口边缘后松开即可吸附。",
+            (false, true, false) => "Drop near another window edge to attach.",
+            (false, false, true) => "自由放置，可拖动角色调整位置。",
+            (false, false, false) => "Drag the companion to place it freely.",
+        }
+    }
+
+    pub fn panel_geometry(&self, desired: Vec2) -> Option<(Pos2, Vec2)> {
+        let (widget, monitors) = self.native.as_ref()?.geometry(Rect::ZERO)?;
+        let monitor = monitors.iter().min_by(|a, b| {
+            a.bounds
+                .distance_sq_to_pos(widget.outer.center())
+                .total_cmp(&b.bounds.distance_sq_to_pos(widget.outer.center()))
+        })?;
+        let margin = 8.0 * widget.scale;
+        let area = monitor.work_area.shrink(margin);
+        let size = (desired * widget.scale).min(area.size());
+        let above = widget.outer.top() - size.y - margin;
+        let y = if above >= area.top() {
+            above
+        } else {
+            widget.outer.bottom() + margin
+        };
+        let position = Pos2::new(
+            (widget.outer.right() - size.x)
+                .clamp(area.left(), (area.right() - size.x).max(area.left())),
+            y.clamp(area.top(), (area.bottom() - size.y).max(area.top())),
+        );
+        Some((position / widget.scale, size / widget.scale))
     }
 
     pub fn begin_drag(&mut self) {
@@ -73,6 +135,16 @@ impl Docking {
             return;
         };
         let now = Instant::now();
+        if self.restore_requested {
+            self.restore_requested = false;
+            if let Some(position) = self.initial_position {
+                let position = clamp_to_monitors(position, widget.outer.size(), &monitors);
+                native.move_to(position);
+                let delta = position - widget.outer.min;
+                widget.outer = widget.outer.translate(delta);
+                widget.content = widget.content.translate(delta);
+            }
+        }
         if let Some(grab) = self.initial_grab.take() {
             self.following_pointer = Some(grab);
             self.dragging = true;
@@ -91,6 +163,9 @@ impl Docking {
             widget.content = widget.content.translate(delta);
         }
         if self.dragging && !native.primary_down() {
+            if self.initial_position.is_none() {
+                self.initial_position = Some(widget.outer.min);
+            }
             self.dragging = false;
             self.following_pointer = None;
             self.needs_snap = self.enabled;

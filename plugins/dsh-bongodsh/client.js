@@ -212,12 +212,26 @@ window.__ModuleLoader__.load({
   const instanceKey = Symbol.for('bongodsh.widget');
   win[instanceKey]?.dispose();
   const storageKey = 'bongodsh:widget:v1';
+  const revisionKey = 'bongodsh:desktop-applied-revision:v1';
   const events = new win.AbortController();
   const state = new model.TypingState();
   const animation = new model.Animation();
   let settings = model.settingsFrom(null);
   let storageFailed = false;
   try { settings = model.settingsFrom(JSON.parse(win.localStorage.getItem(storageKey))); }
+  catch { storageFailed = true; }
+  const consumedRevisions = new Set();
+  function revisionsFrom(raw) {
+    let value;
+    try { value = JSON.parse(raw); } catch { value = raw; }
+    return (Array.isArray(value) ? value : [value])
+      .filter(item => typeof item === 'string' && item.length > 0 && item.length <= 128).slice(-128);
+  }
+  function mergeRevisions(revisions) {
+    for (const revision of revisions) consumedRevisions.add(revision);
+    while (consumedRevisions.size > 128) consumedRevisions.delete(consumedRevisions.values().next().value);
+  }
+  try { mergeRevisions(revisionsFrom(win.localStorage.getItem(revisionKey))); }
   catch { storageFailed = true; }
 
   const host = document.createElement('div');
@@ -295,6 +309,31 @@ window.__ModuleLoader__.load({
   let desktopTimer = 0;
   let desktopVersion = 0;
   let checkingDesktop = false;
+  let desktopCheckQueued = false;
+
+  function syncDesktopSettings(status, apply) {
+    const next = status?.settings;
+    const revision = status?.revision;
+    if (!next || !characters.some(character => character.id === next.character)
+      || !Number.isInteger(next.size) || next.size < 100 || next.size > 220 || typeof next.paused !== 'boolean'
+      || typeof revision !== 'string' || !revision.length || revision.length > 128 || consumedRevisions.has(revision)) return;
+    let persisted = !storageFailed;
+    if (apply) {
+      settings.character = next.character;
+      settings.size = next.size;
+      settings.paused = next.paused;
+      desktopVersion++;
+      resetInput(); syncSettings();
+      persisted = save();
+    }
+    // Consume stale responses too, so the next poll cannot replay them over a newer page choice.
+    mergeRevisions([revision]);
+    if (persisted) {
+      try { win.localStorage.setItem(revisionKey, JSON.stringify([...consumedRevisions])); }
+      catch { storageFailed = true; }
+    }
+    notice.hidden = !storageFailed;
+  }
 
   function setDetached(value) {
     detached = value;
@@ -306,13 +345,18 @@ window.__ModuleLoader__.load({
   async function checkDesktop() {
     win.clearTimeout(desktopTimer);
     desktopTimer = 0;
-    if (disposed || !desktopBridge || document.hidden || checkingDesktop) return;
+    if (disposed || !desktopBridge || document.hidden) return;
+    if (checkingDesktop) { desktopCheckQueued = true; return; }
     checkingDesktop = true;
+    desktopCheckQueued = false;
     const version = desktopVersion;
     try {
       const status = await desktopBridge.status();
       if (disposed) return;
-      if (!detachPending && version === desktopVersion) setDetached(status.active === true);
+      const current = !detachPending && version === desktopVersion;
+      syncDesktopSettings(status, current);
+      if (current) setDetached(status.active === true);
+      else if (!detachPending) desktopCheckQueued = true;
       desktopStatus.textContent = status.available
         ? '拖出窗口后，靠近其他程序的窗口边缘松手即可吸附。'
         : '尚未安装桌面组件，请按插件说明完成桌面设置。';
@@ -321,7 +365,10 @@ window.__ModuleLoader__.load({
         desktopStatus.textContent = '拖出功能需要本机 DSH 和已构建的桌面挂件。';
       }
     } finally { checkingDesktop = false; }
-    if (!disposed && detached && !document.hidden) desktopTimer = win.setTimeout(checkDesktop, 1000);
+    if (!disposed && !document.hidden && !detachPending && (desktopCheckQueued || detached)) {
+      win.clearTimeout(desktopTimer);
+      desktopTimer = win.setTimeout(checkDesktop, desktopCheckQueued ? 0 : 1000);
+    }
   }
 
   async function detachToDesktop(grabX = 0.5, grabY = 0.5) {
@@ -332,24 +379,36 @@ window.__ModuleLoader__.load({
       return;
     }
     detachPending = true;
-    desktopVersion++;
+    const version = ++desktopVersion;
+    let stale = false;
     desktopButton.disabled = true;
     desktopStatus.textContent = '正在移到桌面…';
     resetInput();
     try {
-      await desktopBridge.detach(settings.character, settings.size, grabX, grabY);
+      const status = await desktopBridge.detach(settings.character, settings.size, grabX, grabY, settings.paused);
       if (disposed) return;
+      stale = version !== desktopVersion;
+      syncDesktopSettings(status, !stale);
       endDrag(true);
-      setDetached(true);
+      if (!stale) setDetached(status.active === true);
     } catch (error) {
       if (disposed) return;
       endDrag(true);
-      desktopStatus.textContent = error.message;
-      if (!document.hidden) openPanel();
+      stale = version !== desktopVersion;
+      if (!stale) {
+        desktopStatus.textContent = error.message;
+        if (!document.hidden) openPanel();
+      }
     } finally {
       detachPending = false;
       desktopButton.disabled = false;
-      if (!disposed && detached) desktopTimer = win.setTimeout(checkDesktop, 1000);
+      if (!disposed && !document.hidden) {
+        if (stale || desktopCheckQueued) void checkDesktop();
+        else if (detached) {
+          win.clearTimeout(desktopTimer);
+          desktopTimer = win.setTimeout(checkDesktop, 1000);
+        }
+      }
     }
   }
 
@@ -363,6 +422,7 @@ window.__ModuleLoader__.load({
       storageFailed = false;
     } catch { storageFailed = true; }
     notice.hidden = !storageFailed;
+    return !storageFailed;
   }
 
   function syncSettings() {
@@ -565,15 +625,18 @@ window.__ModuleLoader__.load({
   });
   on(characterInput, 'change', () => {
     settings.character = characterInput.value;
+    desktopVersion++;
     resetInput(); save(); syncSettings(); place();
   });
   on(pauseInput, 'change', () => {
     settings.paused = pauseInput.checked;
+    desktopVersion++;
     resetInput(); save(); syncSettings();
   });
   on(dockInput, 'change', () => { settings.docked = dockInput.checked; save(); place(); });
   on(sizeInput, 'input', () => {
     settings.size = model.clamp(Number(sizeInput.value), 100, 220);
+    desktopVersion++;
     syncSettings(); place();
   });
   on(sizeInput, 'change', save);
@@ -626,9 +689,14 @@ window.__ModuleLoader__.load({
     on(win.visualViewport, 'scroll', schedulePlace);
   }
   on(win, 'storage', event => {
+    if (event.key === revisionKey) {
+      mergeRevisions(revisionsFrom(event.newValue));
+      return;
+    }
     if (event.key !== storageKey && event.key !== null) return;
     try { settings = model.settingsFrom(JSON.parse(event.newValue)); }
     catch { return; }
+    desktopVersion++;
     resetInput(); endDrag(true); syncSettings(); schedulePlace();
   });
 
@@ -690,12 +758,13 @@ window.__ModuleLoader__.load({
 
   return {
     status: () => request({ action: 'status' }),
-    async detach(character, size, grabX, grabY) {
-      pendingDetach = new AbortController();
+    async detach(character, size, grabX, grabY, paused = false) {
+      const controller = new AbortController();
+      pendingDetach = controller;
       try {
-        return await request({ action: 'detach', character, size, grabX, grabY },
-          AbortSignal.any([lifetime.signal, pendingDetach.signal]));
-      } finally { pendingDetach = null; }
+        return await request({ action: 'detach', character, size, grabX, grabY, paused },
+          AbortSignal.any([lifetime.signal, controller.signal]));
+      } finally { if (pendingDetach === controller) pendingDetach = null; }
     },
     cancelDetach() { pendingDetach?.abort(); },
     close: () => request({ action: 'close' }),

@@ -1,6 +1,6 @@
 {
   "name": "dsh-bongodsh",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "BongoDSH 大肥鱼打字挂件，六个彩色角色直接显示在 DSH 页面内。",
   "private": true,
   "license": "UNLICENSED",

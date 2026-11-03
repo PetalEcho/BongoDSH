@@ -9,12 +9,15 @@ use bongodsh_core::{InputEvent, KeyId, TypingState, animation::HandAnimation};
 
 use crate::{
     art,
-    detached::{self, Launch},
+    detached::{self, Launch, Settings},
     docking::Docking,
     global_input::{GlobalInput, Status},
     input,
     sprites::Artwork,
 };
+
+mod controls;
+mod settings;
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum InputSource {
@@ -60,6 +63,10 @@ struct Desktop {
     docking: Docking,
     parent: Option<std::sync::mpsc::Receiver<()>>,
     ready: bool,
+    character: usize,
+    character_size: f32,
+    last_sent_settings: Option<Settings>,
+    bridge_failed: bool,
     typing: TypingState,
     animation: HandAnimation,
     last_frame: Instant,
@@ -72,6 +79,9 @@ struct Desktop {
     global: GlobalInput,
     keyboard_settings_open: bool,
     desktop_settings_open: bool,
+    desktop_settings_focused: bool,
+    desktop_settings_size: egui::Vec2,
+    character_error: Option<String>,
     settings_error: Option<String>,
 }
 
@@ -92,23 +102,31 @@ impl Desktop {
         let parent = launch
             .map(|_| detached::watch_parent(ctx.clone()))
             .transpose()?;
-        ctx.set_visuals(egui::Visuals::light());
-        ctx.global_style_mut(|style| {
-            style.visuals.window_fill = Color32::from_rgb(243, 250, 251);
-            style.visuals.override_text_color = Some(art::INK);
-            style.visuals.selection.bg_fill = Color32::from_rgb(162, 215, 221);
-            style.spacing.button_padding = vec2(10.0, 7.0);
-        });
+        if launch.is_some() {
+            ctx.set_theme(egui::ThemePreference::System);
+        } else {
+            ctx.set_visuals(egui::Visuals::light());
+            ctx.global_style_mut(|style| {
+                style.visuals.window_fill = Color32::from_rgb(243, 250, 251);
+                style.visuals.override_text_color = Some(art::INK);
+                style.visuals.selection.bg_fill = Color32::from_rgb(162, 215, 221);
+                style.spacing.button_padding = vec2(10.0, 7.0);
+            });
+        }
         Ok(Self {
             artwork,
             docking,
             parent,
             ready: false,
+            character: launch.map_or(0, |launch| launch.character),
+            character_size: launch.map_or(160.0, |launch| launch.size),
+            last_sent_settings: None,
+            bridge_failed: false,
             typing: TypingState::default(),
             animation: HandAnimation::default(),
             last_frame: Instant::now(),
             demo: None,
-            paused: false,
+            paused: launch.is_some_and(|launch| launch.paused),
             focused: false,
             always_on_top: true,
             chinese_font: install_system_font(ctx),
@@ -116,6 +134,9 @@ impl Desktop {
             global: GlobalInput::default(),
             keyboard_settings_open: false,
             desktop_settings_open: false,
+            desktop_settings_focused: false,
+            desktop_settings_size: vec2(264.0, 410.0),
+            character_error: None,
             settings_error: None,
         })
     }
@@ -140,9 +161,11 @@ impl Desktop {
     fn start_demo(&mut self) {
         self.global.stop();
         self.reset();
-        self.paused = false;
+        if self.parent.is_none() {
+            self.paused = false;
+        }
         self.demo = Some(Demo {
-            remaining: 8,
+            remaining: if self.parent.is_some() { 2 } else { 8 },
             next_at: Instant::now(),
         });
     }
@@ -159,11 +182,12 @@ impl Desktop {
             return;
         }
         let key = KeyId::new(u32::from(demo.remaining));
+        let interval = Duration::from_millis(if self.parent.is_some() { 120 } else { 190 });
         demo.remaining -= 1;
-        demo.next_at = now + Duration::from_millis(190);
+        demo.next_at = now + interval;
         self.apply(InputEvent::Press { key, repeat: false });
         self.apply(InputEvent::Release(key));
-        ctx.request_repaint_after(Duration::from_millis(190));
+        ctx.request_repaint_after(interval);
     }
 
     fn restart_input(&mut self, ctx: &egui::Context) {
@@ -298,26 +322,26 @@ impl Desktop {
         );
     }
 
-    fn desktop_window(&mut self, ctx: &egui::Context) {
-        if !self.desktop_settings_open {
+    fn publish_settings(&mut self, ctx: Option<&egui::Context>) {
+        if !self.ready || self.parent.is_none() || self.bridge_failed {
             return;
         }
-        ctx.show_viewport_immediate(
-            egui::ViewportId::from_hash_of("desktop-settings"),
-            egui::ViewportBuilder::default()
-                .with_title(self.text("BongoDSH · 桌面角色", "BongoDSH · Desktop companion"))
-                .with_inner_size([360.0, 450.0]),
-            |ui, _class| {
-                if ui.ctx().input(|input| input.viewport().close_requested()) {
-                    self.desktop_settings_open = false;
-                }
-                egui::Frame::central_panel(ui.style())
-                    .inner_margin(16.0)
-                    .show(ui, |ui| {
-                        egui::ScrollArea::vertical().show(ui, |ui| self.menu(ui));
-                    });
-            },
-        );
+        let settings = Settings {
+            character: self.character,
+            size: self.character_size,
+            paused: self.paused,
+        };
+        if self.last_sent_settings == Some(settings) {
+            return;
+        }
+        if settings.write_to(&mut std::io::stdout().lock()).is_ok() {
+            self.last_sent_settings = Some(settings);
+        } else {
+            self.bridge_failed = true;
+            if let Some(ctx) = ctx {
+                ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, ViewportCommand::Close);
+            }
+        }
     }
 
     fn menu(&mut self, ui: &mut egui::Ui) {
@@ -397,8 +421,10 @@ impl eframe::App for Desktop {
             return;
         }
         let now = Instant::now();
+        let settings_active =
+            self.parent.is_some() && (self.desktop_settings_open || self.keyboard_settings_open);
         let events = self.global.poll();
-        if !self.paused && self.demo.is_none() {
+        if !settings_active && !self.paused && self.demo.is_none() {
             for event in events {
                 self.apply(event);
             }
@@ -409,7 +435,7 @@ impl eframe::App for Desktop {
                 self.reset();
             }
             self.focused = state.focused;
-            if local_input && state.focused && !self.paused {
+            if !settings_active && local_input && state.focused && !self.paused {
                 for event in &state.events {
                     if let Some(input) = input::normalize(event) {
                         self.apply(input);
@@ -446,6 +472,8 @@ impl eframe::App for Desktop {
         }
         if self.artwork.is_some() {
             if response.secondary_clicked() {
+                self.reset();
+                self.desktop_settings_focused = false;
                 self.desktop_settings_open = true;
             }
         } else {
@@ -453,7 +481,11 @@ impl eframe::App for Desktop {
         }
         let response = response.on_hover_cursor(egui::CursorIcon::Grab);
         if let Some(artwork) = &self.artwork {
-            artwork.draw(ui.painter(), bounds, self.animation.positions());
+            let mut painter = ui.painter().clone();
+            if self.paused {
+                painter.set_opacity(0.62);
+            }
+            artwork.draw(&painter, bounds, self.animation.positions());
         } else {
             art::draw(ui.painter(), bounds, self.animation.positions());
         }
@@ -466,6 +498,7 @@ impl eframe::App for Desktop {
                 .and_then(|_| output.flush())
                 .is_err()
             {
+                self.bridge_failed = true;
                 ui.ctx().send_viewport_cmd(ViewportCommand::Close);
             }
         }
@@ -533,9 +566,11 @@ impl eframe::App for Desktop {
         }
         self.keyboard_window(ui.ctx());
         self.desktop_window(ui.ctx());
+        self.publish_settings(Some(ui.ctx()));
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.publish_settings(None);
         self.global.stop();
     }
 

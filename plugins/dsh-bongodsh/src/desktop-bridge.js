@@ -19,12 +19,13 @@ export function createDesktopBridge(ctx) {
 
   return {
     status: () => request({ action: 'status' }),
-    async detach(character, size, grabX, grabY) {
-      pendingDetach = new AbortController();
+    async detach(character, size, grabX, grabY, paused = false) {
+      const controller = new AbortController();
+      pendingDetach = controller;
       try {
-        return await request({ action: 'detach', character, size, grabX, grabY },
-          AbortSignal.any([lifetime.signal, pendingDetach.signal]));
-      } finally { pendingDetach = null; }
+        return await request({ action: 'detach', character, size, grabX, grabY, paused },
+          AbortSignal.any([lifetime.signal, controller.signal]));
+      } finally { if (pendingDetach === controller) pendingDetach = null; }
     },
     cancelDetach() { pendingDetach?.abort(); },
     close: () => request({ action: 'close' }),
