@@ -59,7 +59,7 @@ cargo build --workspace --release --locked
 
 ```text
 assets/
-  concepts/         三个角色的身体线稿与彩稿
+  concepts/         三个角色的独立身体与双手，保留线稿和彩稿
   characters/       水手、睡衣、魔法师的独立身体与双手，保留线稿和彩稿
 plugins/
   dsh-bongodsh/     DSH 页面插件、预编译客户端与本地预览
