@@ -2,6 +2,8 @@
 
 生成日期：2026-11-02。使用内置 imagegen，线稿请求第一次成功。输出为 `assets/concepts/fish-maid-lineart.png`，1592 × 988，RGBA 透明背景。
 
+2026-11-03，用户要求将现有线稿全部上色。六张身体和通用独立手部的彩色版本、配色与实际提示词见[角色上色记录](colored-characters.md)。以下保留线稿阶段记录。
+
 身体参考：[dsh-bongo-fish 的 body.png](https://github.com/YUsaltyfish/dsh-bongo-fish/blob/main/assets/art/body.png)，读取时文件 SHA 为 `73ff868b5cdf4967f1ad5a82d95de35ef8644595`，原图 1222 × 758。
 
 三套换装的手部参考：[hand-bounce.png](https://github.com/YUsaltyfish/dsh-bongo-fish/blob/main/assets/art/hand-bounce.png)，读取时文件 SHA 为 `42c317e58e71d1723260e21e463624887582bf46`，原图 210 × 179。按用户补充要求取其简单、饱满的横向椭圆轮廓，不画手指、拇指或袖口。线稿使用黑色外轮廓，内部透明。身体、左手和右手分别保存为独立 PNG。两张原始参考图均未复制到仓库。
@@ -36,4 +38,4 @@ Use case: style-transfer. Edit target: the supplied reference PNG of a blue-hair
 
 这些是基于用户指定参考图生成的线稿研究稿，没有登记为程序内置角色。上游 [README 的许可说明](https://github.com/YUsaltyfish/dsh-bongo-fish#许可) 区分代码与素材许可，图片不会因为代码采用 MIT 而获得同等授权。本记录不对原始角色或派生美术授予额外许可。
 
-先前生成的圆球鱼水手、睡衣、魔法师图集已按用户要求删除，没有提交。用户随后要求以当前鱼娘线稿重新制作这三套装扮，保留趴卧造型，并明确身体与双手须输出为独立图片文件。附件少女 Q 版仍不继续生成。
+先前生成的圆球鱼水手、睡衣、魔法师图集已按用户要求删除，没有提交。用户随后要求以当前鱼娘线稿重新制作这三套装扮，保留趴卧造型，并明确身体与双手须输出为独立图片文件。早先 `50.webp` 附件的生成已取消；后来单独指定的两张附件按[趴窝角色记录](prone-lineart-drafts.md)制作。
