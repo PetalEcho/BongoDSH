@@ -3,8 +3,8 @@
 ## 产品与范围
 
 - BongoDSH 是使用 Rust 实现的独立桌面打字挂件，目标平台为 macOS 和 Windows。
-- DSH 指参考仓库所使用的 DeepSeek Harness。`plugins/dsh-bongodsh/` 提供页面角色和拖出桌面的宿主桥接；原生输入框定位与任务事件尚未接入。协议与验证边界见 `docs/desktop-bridge.md`。
-- 项目基调、分期和平台边界见 `docs/project-baseline.md`。当前已有 egui/eframe 桌面原型与 macOS / Windows 全局键盘适配，首次默认窗口输入，用户主动选择的输入模式保存在本机，重启或重新拖出后恢复；恢复全局模式不自动申请系统权限。权限与验证边界见 `docs/global-keyboard.md`；页面插件的安装和兼容边界见 `plugins/dsh-bongodsh/README.md`。
+- DSH 指参考仓库所使用的 DeepSeek Harness。`plugins/dsh-bongodsh/` 提供页面角色和拖出桌面的宿主桥接；原生输入框定位与任务事件尚未接入。使用边界见 `plugins/dsh-bongodsh/README.md`。
+- 当前已有 egui/eframe 桌面原型与 macOS / Windows 全局键盘适配，首次默认窗口输入，用户主动选择的输入模式保存在本机，重启或重新拖出后恢复；恢复全局模式不自动申请系统权限。权限、安装和兼容边界见 `plugins/dsh-bongodsh/README.md`。
 - 角色小巧、低干扰，主要操作通过右键或托盘进入。设置面板优先展示预览和常用设置，不使用超大标题或口号式 Hero。
 - 用户明确要求角色不配键盘图形。身体与双手保持独立图层，双手叠放在身体前侧，不在身体下方单独留一排空间。
 
@@ -30,7 +30,7 @@
 ## DSH 页面插件
 
 - 插件使用无生产依赖的 JavaScript。拖出经 DSH 认证连接启动固定本地二进制，只传角色、尺寸、暂停、独立手部和身体幅度及归一化抓取位置，不启动额外网络监听或接收任意路径与命令。宿主管道关闭须回收子进程。
-- 角色原图和线稿保存在根 `assets/`，来源见 `docs/dsh-character-assets.md`；插件通过 `src/characters.js` 登记彩稿。构建时将 PNG 原样编码并去重，内嵌到 `client.js`，兼容没有资源接口的 DSH 0.2.1-rc.5，不修改原图像素。没有独立手部素材的角色仅做身体动作。
+- 角色原图和线稿保存在根 `assets/`，来源见 `plugins/dsh-bongodsh/ASSETS.md`；插件通过 `src/characters.js` 登记彩稿。构建时将 PNG 原样编码并去重，内嵌到 `client.js`，兼容没有资源接口的 DSH 0.2.1-rc.5，不修改原图像素。没有独立手部素材的角色仅做身体动作。
 - 修改 `plugins/dsh-bongodsh/src/` 后运行该目录的 `npm run build` 与 `npm run check`，保留生成的 `client.js`。安装包使用 `files` 白名单，预览和本地测试不打包。
 - 页面坐标仅使用 CSS 像素和显式输入框标记；原生鼠标接续拖动，跨程序吸附只读取窗口几何，不读取其他程序输入框。插件卸载时清理 DOM、事件、定时器、动画帧、观察器和宿主子进程。
 - 插件本地测试放在忽略的 `plugins/dsh-bongodsh/tests/`，同样不得暂存、提交或推送。
@@ -47,6 +47,7 @@ cargo run --locked --bin bongodsh -- --demo
 
 - 本地回归用例放在各 crate 的 `tests/`，当前两个测试目录按用户约定忽略。其他测试文件同样不得暂存、提交或推送。
 - CI 只验证检出后可用的目标。测试未随源码提交时，CI 的 `cargo test` 不代表执行了本地回归用例。
+- `docs/` 仅跟踪和推送 `releases/`；其他文档保留在本地并忽略。
 - 提交 `Cargo.lock`。仅按明确文件路径暂存，提交前检查暂存清单与差异。
 - 推送前逐个检查待推送提交；任一提交包含测试文件变更时停止该推送。
 - 不自动提交、推送、发布或更改系统权限。记录实际运行平台，未运行的检查明确标注。

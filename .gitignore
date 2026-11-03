@@ -12,3 +12,7 @@
 /plugins/dsh-bongodsh/tests/
 /plugins/dsh-bongodsh/dist/
 /plugins/dsh-bongodsh/native/
+
+# docs 仅发布版本记录，其余文档保留在本地。
+/docs/*
+!/docs/releases/

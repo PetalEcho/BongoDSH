@@ -55,7 +55,7 @@ dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/down
 
 窗口失焦、暂停或监听中断时清空按住状态。DSH 退出或禁用插件会回收它启动的桌面进程；刷新页面可重新连接已启动的角色。独立运行的桌面原型不依赖 DSH。
 
-页面定位依赖 DSH 的输入框标记；桌面吸附只读取窗口几何，不定位其他程序的输入框。当前没有声音、任务提醒、自定义素材、托盘或点击穿透。协议见 [桌面桥接](https://github.com/PetalEcho/BongoDSH/blob/v0.2.5/docs/desktop-bridge.md)，权限说明见 [全局键盘](https://github.com/PetalEcho/BongoDSH/blob/v0.2.5/docs/global-keyboard.md)。
+页面定位依赖 DSH 的输入框标记；桌面吸附只读取窗口几何，不定位其他程序的输入框。当前没有声音、任务提醒、自定义素材、托盘或点击穿透。
 
 ## 从源码运行
 
@@ -89,7 +89,7 @@ npm run release
 
 如只需刷新本机桌面组件，使用 `npm run prepare:native`。它只更新当前平台的 `native/`。修改素材后必须重新生成客户端并重建原生程序。
 
-本地回归放在被忽略的 `tests/`，存在时可运行 `node --test tests/*.test.mjs`。CI 校验语法、生成产物与包清单，不包含未提交的回归用例。实际平台和历史检查见 [验证记录](https://github.com/PetalEcho/BongoDSH/blob/v0.2.5/docs/plugin-validation.md)。
+本地回归放在被忽略的 `tests/`，存在时可运行 `node --test tests/*.test.mjs`。CI 校验语法、生成产物与包清单，不包含未提交的回归用例。
 
 ## 素材
 

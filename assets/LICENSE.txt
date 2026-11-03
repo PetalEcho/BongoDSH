@@ -10,5 +10,4 @@ JavaScript, included in native binaries, or displayed in documentation.
 Confirm applicable rights with the relevant rights holders before reuse or
 redistribution. Code licensing does not establish artwork permissions.
 
-See ../docs/dsh-character-assets.md and
-../plugins/dsh-bongodsh/ASSETS.md for provenance and generation records.
+See ../plugins/dsh-bongodsh/ASSETS.md for provenance and generation records.

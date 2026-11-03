@@ -123,7 +123,7 @@ npm run release
 | `crates/bongodsh-app/`  | 桌面窗口、角色绘制和系统输入适配 |
 | `plugins/dsh-bongodsh/` | DSH 插件、客户端源码和打包脚本   |
 | `assets/`               | 角色身体、双手彩稿及历史线稿     |
-| `docs/`                 | 桥接协议、平台边界和验证记录     |
+| `docs/releases/`        | 版本更新与安装说明               |
 
 
 ## 更新记录
