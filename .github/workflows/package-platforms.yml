@@ -43,8 +43,9 @@ jobs:
         with:
           ref: ${{ env.BUILD_REF }}
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: '1.93.1'
           components: rustfmt, clippy
       - uses: actions/setup-node@v6
         with:
