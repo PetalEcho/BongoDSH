@@ -36,13 +36,13 @@ export function createArtwork(document, characters) {
     for (const [name, value] of Object.entries(geometry)) image.setAttribute(name, String(value));
   }
 
-  function render(positions) {
-    const activity = Math.max(0, Math.min(1, Math.max(...positions)));
+  function render(positions, handAmplitude = 100, bodyAmplitude = 100) {
+    const activity = Math.max(0, Math.min(1, Math.max(...positions))) * bodyAmplitude / 100;
     body.group.setAttribute('transform', `translate(150 ${bodyBottom}) scale(${1 + activity * 0.02} ${1 - activity * 0.035}) translate(-150 ${-bodyBottom})`);
     hands.forEach(({ group }, index) => {
-      const press = Math.max(-0.2, Math.min(1.15, positions[index]));
+      const press = Math.max(-0.2, Math.min(1.15, positions[index])) * handAmplitude / 100;
       const x = handLayout[index].centerX;
-      group.setAttribute('transform', `translate(${x} ${bodyBottom + press * 0.7}) scale(${1 + press * 0.06} ${1 - press * 0.15}) translate(${-x} ${-bodyBottom})`);
+      group.setAttribute('transform', `translate(${x} ${bodyBottom + Math.min(press * 0.7, 1.2)}) scale(${1 + press * 0.06} ${1 - press * 0.15}) translate(${-x} ${-bodyBottom})`);
     });
   }
 

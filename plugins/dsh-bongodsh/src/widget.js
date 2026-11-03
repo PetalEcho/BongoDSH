@@ -59,7 +59,11 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     <label class="row">跟随输入框<input name="docked" type="checkbox"></label>
     <label class="row" for="bongo-size">角色大小<output for="bongo-size"></output></label>
     <input id="bongo-size" name="size" type="range" min="100" max="220" step="10">
-    <div class="actions"><button type="button" class="action demo">试一下</button><button type="button" class="action reset">恢复位置</button></div>
+    <label class="row" for="bongo-hand-amplitude">手部幅度<output for="bongo-hand-amplitude"></output></label>
+    <input id="bongo-hand-amplitude" name="handAmplitude" type="range" min="0" max="200" step="10">
+    <label class="row" for="bongo-body-amplitude">身体幅度<output for="bongo-body-amplitude"></output></label>
+    <input id="bongo-body-amplitude" name="bodyAmplitude" type="range" min="0" max="200" step="10">
+    <div class="actions"><button type="button" class="action reset">恢复位置</button></div>
     <button type="button" class="action desktop">移到桌面</button>
     <p class="note desktop-status" role="status">拖出窗口可移到桌面，并吸附其他程序窗口。</p>
     <p class="note anchor-status"></p>
@@ -77,6 +81,10 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   const pauseInput = panel.querySelector('[name=paused]');
   const dockInput = panel.querySelector('[name=docked]');
   const sizeInput = panel.querySelector('[name=size]');
+  const handAmplitudeInput = panel.querySelector('[name=handAmplitude]');
+  const bodyAmplitudeInput = panel.querySelector('[name=bodyAmplitude]');
+  const handAmplitudeOutput = panel.querySelector('output[for=bongo-hand-amplitude]');
+  const bodyAmplitudeOutput = panel.querySelector('output[for=bongo-body-amplitude]');
   const output = panel.querySelector('output');
   const closeButton = panel.querySelector('.close');
   const notice = panel.querySelector('.notice');
@@ -87,7 +95,6 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   let disposed = false;
   let frame = 0;
   let lastFrame = null;
-  let demoTimer = 0;
   let layoutFrame = 0;
   let mutationObserver;
   let resizeObserver;
@@ -106,14 +113,18 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   function syncDesktopSettings(status, apply) {
     const next = status?.settings;
     const revision = status?.revision;
+    const { handAmplitude = 100, bodyAmplitude = 100 } = next ?? {};
     if (!next || !characters.some(character => character.id === next.character)
       || !Number.isInteger(next.size) || next.size < 100 || next.size > 220 || typeof next.paused !== 'boolean'
+      || ![handAmplitude, bodyAmplitude].every(value => Number.isInteger(value) && value >= 0 && value <= 200)
       || typeof revision !== 'string' || !revision.length || revision.length > 128 || consumedRevisions.has(revision)) return;
     let persisted = !storageFailed;
     if (apply) {
       settings.character = next.character;
       settings.size = next.size;
       settings.paused = next.paused;
+      settings.handAmplitude = handAmplitude;
+      settings.bodyAmplitude = bodyAmplitude;
       desktopVersion++;
       resetInput(); syncSettings();
       persisted = save();
@@ -177,7 +188,8 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     desktopStatus.textContent = '正在移到桌面…';
     resetInput();
     try {
-      const status = await desktopBridge.detach(settings.character, settings.size, grabX, grabY, settings.paused);
+      const status = await desktopBridge.detach(settings.character, settings.size, grabX, grabY,
+        settings.paused, settings.handAmplitude, settings.bodyAmplitude);
       if (disposed) return;
       stale = version !== desktopVersion;
       syncDesktopSettings(status, !stale);
@@ -229,6 +241,10 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     dockInput.checked = settings.docked;
     sizeInput.value = String(settings.size);
     output.textContent = `${settings.size} px`;
+    handAmplitudeInput.value = String(settings.handAmplitude);
+    bodyAmplitudeInput.value = String(settings.bodyAmplitude);
+    handAmplitudeOutput.textContent = `${settings.handAmplitude}%`;
+    bodyAmplitudeOutput.textContent = `${settings.bodyAmplitude}%`;
     pet.dataset.paused = String(settings.paused);
     notice.hidden = !storageFailed;
   }
@@ -298,7 +314,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   }
 
   function render() {
-    artwork.render(animation.positions(motionPreference.matches));
+    artwork.render(animation.positions(motionPreference.matches), settings.handAmplitude, settings.bodyAmplitude);
   }
 
   function animate(now) {
@@ -318,8 +334,6 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   }
 
   function resetInput() {
-    win.clearTimeout(demoTimer);
-    demoTimer = 0;
     if (frame) win.cancelAnimationFrame(frame);
     frame = 0;
     lastFrame = null;
@@ -432,19 +446,20 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     syncSettings(); place();
   });
   on(sizeInput, 'change', save);
+  for (const [input, name] of [[handAmplitudeInput, 'handAmplitude'], [bodyAmplitudeInput, 'bodyAmplitude']]) {
+    on(input, 'input', () => {
+      const value = Number(input.value);
+      if (!Number.isInteger(value)) return;
+      settings[name] = model.clamp(value, 0, 200);
+      desktopVersion++;
+      syncSettings(); render(); save();
+    });
+  }
   on(panel.querySelector('.reset'), 'click', () => {
     settings.docked = true; settings.x = 1; settings.y = 1;
     save(); syncSettings(); place();
   });
   on(desktopButton, 'click', () => { void detachToDesktop(); });
-  on(panel.querySelector('.demo'), 'click', () => {
-    resetInput();
-    apply(state.press('KeyA')); apply(state.release('KeyA'));
-    demoTimer = win.setTimeout(() => {
-      apply(state.press('KeyB')); apply(state.release('KeyB'));
-      demoTimer = 0;
-    }, 120);
-  });
   on(win, 'keydown', event => {
     if (!event.isTrusted || document.hidden || detached || detachPending || settings.paused || !panel.hidden || ownEvent(event) || passwordEvent(event)) return;
     if (event.metaKey || ((event.ctrlKey || event.altKey) && !event.getModifierState('AltGraph'))) {

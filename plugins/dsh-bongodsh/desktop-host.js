@@ -53,7 +53,7 @@ export function createDesktopHost({ resolveExecutable = findExecutable, spawnPro
     if (disposed || signal?.aborted) throw new Error('桌面连接已关闭。');
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)
       || !['status', 'detach', 'close'].includes(payload.action)
-      || Object.keys(payload).some(key => !['action', 'character', 'size', 'grabX', 'grabY', 'paused'].includes(key))) {
+      || Object.keys(payload).some(key => !['action', 'character', 'size', 'grabX', 'grabY', 'paused', 'handAmplitude', 'bodyAmplitude'].includes(key))) {
       throw new Error('无效的桌面挂件请求。');
     }
     if (payload.action === 'close') {
@@ -65,11 +65,14 @@ export function createDesktopHost({ resolveExecutable = findExecutable, spawnPro
     if (payload.action === 'status') return snapshot(!!executable);
     if (!executable) throw new Error('尚未安装桌面组件，请按插件说明完成桌面设置。');
     const paused = payload.paused === undefined ? false : payload.paused;
+    const handAmplitude = payload.handAmplitude === undefined ? 100 : payload.handAmplitude;
+    const bodyAmplitude = payload.bodyAmplitude === undefined ? 100 : payload.bodyAmplitude;
     if (!characterIds.has(payload.character) || !Number.isInteger(payload.size)
       || payload.size < 100 || payload.size > 220
       || typeof paused !== 'boolean'
+      || ![handAmplitude, bodyAmplitude].every(value => Number.isInteger(value) && value >= 0 && value <= 200)
       || ![payload.grabX, payload.grabY].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) {
-      throw new Error('角色、大小或拖动位置无效。');
+      throw new Error('角色、大小、动作幅度或拖动位置无效。');
     }
     if (session) {
       const current = session;
@@ -81,6 +84,7 @@ export function createDesktopHost({ resolveExecutable = findExecutable, spawnPro
     const child = spawnProcess(executable, [
       '--detached', payload.character, String(payload.size), '--grab', String(payload.grabX), String(payload.grabY),
       '--paused', String(paused),
+      '--hand-amplitude', String(handAmplitude), '--body-amplitude', String(bodyAmplitude),
     ], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true, shell: false });
     let resolveReady;
     let rejectReady;
@@ -122,14 +126,19 @@ export function createDesktopHost({ resolveExecutable = findExecutable, spawnPro
         resolveReady();
         return;
       }
-      if (!current.readyReceived || message.event !== 'settings' || keys.length !== 4
-        || !keys.every(key => ['event', 'character', 'size', 'paused'].includes(key))
+      const legacy = keys.length === 4 && !keys.includes('handAmplitude') && !keys.includes('bodyAmplitude');
+      const handAmplitude = legacy ? 100 : message.handAmplitude;
+      const bodyAmplitude = legacy ? 100 : message.bodyAmplitude;
+      if (!current.readyReceived || message.event !== 'settings' || (!legacy && keys.length !== 6)
+        || !keys.every(key => ['event', 'character', 'size', 'paused', 'handAmplitude', 'bodyAmplitude'].includes(key))
         || !characterIds.has(message.character) || !Number.isInteger(message.size)
-        || message.size < 100 || message.size > 220 || typeof message.paused !== 'boolean') {
+        || message.size < 100 || message.size > 220 || typeof message.paused !== 'boolean'
+        || ![handAmplitude, bodyAmplitude].every(value => Number.isInteger(value) && value >= 0 && value <= 200)) {
         rejectOutput(); return;
       }
-      if (settings?.character !== message.character || settings.size !== message.size || settings.paused !== message.paused) {
-        settings = { character: message.character, size: message.size, paused: message.paused };
+      const nextSettings = { character: message.character, size: message.size, paused: message.paused, handAmplitude, bodyAmplitude };
+      if (Object.keys(nextSettings).some(key => settings?.[key] !== nextSettings[key])) {
+        settings = nextSettings;
         revision = randomUUID();
       }
     }

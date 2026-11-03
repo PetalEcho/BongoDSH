@@ -139,9 +139,16 @@ impl Artwork {
         screen_rect(body.union(left).union(right), bounds)
     }
 
-    pub fn draw(&self, painter: &Painter, bounds: Rect, positions: HandPositions) {
+    pub fn animated_rects(
+        &self,
+        positions: HandPositions,
+        hand_amplitude: u16,
+        body_amplitude: u16,
+    ) -> [Rect; 3] {
         let mut rects = self.rects();
-        let activity = positions.left.max(positions.right).clamp(0.0, 1.0);
+        let hand_factor = f32::from(hand_amplitude.min(200)) / 100.0;
+        let body_factor = f32::from(body_amplitude.min(200)) / 100.0;
+        let activity = positions.left.max(positions.right).clamp(0.0, 1.0) * body_factor;
         rects[0] = transform(
             rects[0],
             pos2(150.0, 248.0),
@@ -149,15 +156,30 @@ impl Artwork {
             Vec2::ZERO,
         );
         for (index, press) in [positions.left, positions.right].into_iter().enumerate() {
-            let press = press.clamp(-0.2, 1.15);
+            let press = press.clamp(-0.2, 1.15) * hand_factor;
             rects[index + 1] = transform(
                 rects[index + 1],
                 pos2(self.centers[index], 248.0),
                 vec2(1.0 + press * 0.06, 1.0 - press * 0.15),
-                vec2(0.0, press * 0.7),
+                vec2(0.0, (press * 0.7).min(1.2)),
             );
         }
-        for (sprite, rect) in self.layers.iter().zip(rects) {
+        rects
+    }
+
+    pub fn draw(
+        &self,
+        painter: &Painter,
+        bounds: Rect,
+        positions: HandPositions,
+        hand_amplitude: u16,
+        body_amplitude: u16,
+    ) {
+        for (sprite, rect) in
+            self.layers
+                .iter()
+                .zip(self.animated_rects(positions, hand_amplitude, body_amplitude))
+        {
             painter.image(
                 sprite.texture.id(),
                 screen_rect(rect, bounds),

@@ -88,6 +88,8 @@ export function createModel(characterIds = ['fish-maid']) {
       character: characterIds.includes(source.character) ? source.character : characterIds[0],
       size: Number.isFinite(source.size) ? clamp(source.size, 100, 220) : 160,
       paused: source.paused === true,
+      handAmplitude: Number.isInteger(source.handAmplitude) ? clamp(source.handAmplitude, 0, 200) : 100,
+      bodyAmplitude: Number.isInteger(source.bodyAmplitude) ? clamp(source.bodyAmplitude, 0, 200) : 100,
       docked: source.docked !== false,
       x: Number.isFinite(source.x) ? clamp(source.x, 0, 1) : 1,
       y: Number.isFinite(source.y) ? clamp(source.y, 0, 1) : 1,

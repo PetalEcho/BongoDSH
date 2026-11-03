@@ -12,6 +12,8 @@ pub(crate) struct Launch {
     pub size: f32,
     pub grab: egui::Vec2,
     pub paused: bool,
+    pub hand_amplitude: u16,
+    pub body_amplitude: u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -19,6 +21,8 @@ pub(crate) struct Settings {
     pub character: usize,
     pub size: f32,
     pub paused: bool,
+    pub hand_amplitude: u16,
+    pub body_amplitude: u16,
 }
 
 impl Settings {
@@ -35,10 +39,16 @@ impl Settings {
                 "角色大小无效。",
             ));
         }
+        if self.hand_amplitude > 200 || self.body_amplitude > 200 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "动作幅度应为 0–200 的整数百分比。",
+            ));
+        }
         writeln!(
             output,
-            "{{\"event\":\"settings\",\"character\":\"{character}\",\"size\":{},\"paused\":{}}}",
-            self.size, self.paused
+            "{{\"event\":\"settings\",\"character\":\"{character}\",\"size\":{},\"paused\":{},\"handAmplitude\":{},\"bodyAmplitude\":{}}}",
+            self.size, self.paused, self.hand_amplitude, self.body_amplitude
         )?;
         output.flush()
     }
@@ -68,6 +78,8 @@ impl Launch {
         }
         let mut grab = None;
         let mut paused = None;
+        let mut hand_amplitude = None;
+        let mut body_amplitude = None;
         let mut rest = rest;
         while !rest.is_empty() {
             match rest {
@@ -83,9 +95,21 @@ impl Launch {
                     });
                     rest = remaining;
                 }
+                [flag, value, remaining @ ..]
+                    if flag == "--hand-amplitude" && hand_amplitude.is_none() =>
+                {
+                    hand_amplitude = Some(percentage(value)?);
+                    rest = remaining;
+                }
+                [flag, value, remaining @ ..]
+                    if flag == "--body-amplitude" && body_amplitude.is_none() =>
+                {
+                    body_amplitude = Some(percentage(value)?);
+                    rest = remaining;
+                }
                 _ => {
                     return Err(
-                        "可选参数为 --grab <0..1> <0..1> 和 --paused true|false，各使用一次。",
+                        "可选参数为 --grab、--paused、--hand-amplitude 和 --body-amplitude，各使用一次。",
                     );
                 }
             }
@@ -95,8 +119,18 @@ impl Launch {
             size,
             grab: grab.unwrap_or(egui::Vec2::splat(0.5)),
             paused: paused.unwrap_or(false),
+            hand_amplitude: hand_amplitude.unwrap_or(100),
+            body_amplitude: body_amplitude.unwrap_or(100),
         })
     }
+}
+
+fn percentage(value: &OsString) -> Result<u16, &'static str> {
+    value
+        .to_str()
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|value| *value <= 200)
+        .ok_or("动作幅度应为 0–200 的整数百分比。")
 }
 
 fn number(value: &OsString, min: f32, max: f32) -> Result<f32, &'static str> {

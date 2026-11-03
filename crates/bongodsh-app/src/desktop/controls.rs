@@ -10,6 +10,15 @@ pub(super) fn size_slider(ui: &mut egui::Ui, size: &mut f32) -> egui::Response {
     )
 }
 
+pub(super) fn amplitude_slider(ui: &mut egui::Ui, percent: &mut u16) -> egui::Response {
+    ui.add(
+        egui::Slider::new(percent, 0..=200)
+            .integer()
+            .step_by(10.0)
+            .show_value(false),
+    )
+}
+
 pub(super) fn checkbox_row(ui: &mut egui::Ui, label: &str, value: &mut bool) -> bool {
     ui.push_id(label, |ui| {
         ui.allocate_ui_with_layout(

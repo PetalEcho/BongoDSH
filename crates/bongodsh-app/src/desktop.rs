@@ -5,7 +5,7 @@ use eframe::egui::{
     ViewportCommand, WindowLevel, pos2, vec2,
 };
 
-use bongodsh_core::{InputEvent, KeyId, TypingState, animation::HandAnimation};
+use bongodsh_core::{InputEvent, TypingState, animation::HandAnimation};
 
 use crate::{
     art,
@@ -53,11 +53,6 @@ pub(crate) fn run(launch: Option<Launch>) -> eframe::Result {
     )
 }
 
-struct Demo {
-    remaining: u8,
-    next_at: Instant,
-}
-
 struct Desktop {
     artwork: Option<Artwork>,
     docking: Docking,
@@ -65,12 +60,13 @@ struct Desktop {
     ready: bool,
     character: usize,
     character_size: f32,
+    hand_amplitude: u16,
+    body_amplitude: u16,
     last_sent_settings: Option<Settings>,
     bridge_failed: bool,
     typing: TypingState,
     animation: HandAnimation,
     last_frame: Instant,
-    demo: Option<Demo>,
     paused: bool,
     focused: bool,
     always_on_top: bool,
@@ -120,12 +116,13 @@ impl Desktop {
             ready: false,
             character: launch.map_or(0, |launch| launch.character),
             character_size: launch.map_or(160.0, |launch| launch.size),
+            hand_amplitude: launch.map_or(100, |launch| launch.hand_amplitude),
+            body_amplitude: launch.map_or(100, |launch| launch.body_amplitude),
             last_sent_settings: None,
             bridge_failed: false,
             typing: TypingState::default(),
             animation: HandAnimation::default(),
             last_frame: Instant::now(),
-            demo: None,
             paused: launch.is_some_and(|launch| launch.paused),
             focused: false,
             always_on_top: true,
@@ -158,48 +155,15 @@ impl Desktop {
         self.animation = HandAnimation::default();
     }
 
-    fn start_demo(&mut self) {
-        self.global.stop();
-        self.reset();
-        if self.parent.is_none() {
-            self.paused = false;
-        }
-        self.demo = Some(Demo {
-            remaining: if self.parent.is_some() { 2 } else { 8 },
-            next_at: Instant::now(),
-        });
-    }
-
-    fn advance_demo(&mut self, now: Instant, ctx: &egui::Context) {
-        let Some(demo) = &mut self.demo else { return };
-        if now < demo.next_at {
-            ctx.request_repaint_after(demo.next_at - now);
-            return;
-        }
-        if demo.remaining == 0 {
-            self.demo = None;
-            self.restart_input(ctx);
-            return;
-        }
-        let key = KeyId::new(u32::from(demo.remaining));
-        let interval = Duration::from_millis(if self.parent.is_some() { 120 } else { 190 });
-        demo.remaining -= 1;
-        demo.next_at = now + interval;
-        self.apply(InputEvent::Press { key, repeat: false });
-        self.apply(InputEvent::Release(key));
-        ctx.request_repaint_after(interval);
-    }
-
     fn restart_input(&mut self, ctx: &egui::Context) {
         self.global.stop();
         self.reset();
-        if self.source == InputSource::Global && !self.paused && self.demo.is_none() {
+        if self.source == InputSource::Global && !self.paused {
             self.global.start(ctx);
         }
     }
 
     fn switch_source(&mut self, source: InputSource, ctx: &egui::Context) {
-        self.demo = None;
         self.source = source;
         self.restart_input(ctx);
     }
@@ -254,10 +218,10 @@ impl Desktop {
         }
         ui.add_space(8.0);
         ui.label(self.text("只处理物理按键的按下和松开，不读取、保存或上传输入文字。", "Only physical key presses and releases are processed. Typed text is never read, stored or uploaded."));
-        if self.paused || self.demo.is_some() {
+        if self.paused {
             ui.label(self.text(
-                "暂停或演示期间停止真实键盘监听。",
-                "Live capture is stopped while paused or playing the demo.",
+                "暂停期间停止真实键盘监听。",
+                "Live capture is stopped while paused.",
             ));
         }
         if let Status::Failed(error) = self.global.status() {
@@ -330,6 +294,8 @@ impl Desktop {
             character: self.character,
             size: self.character_size,
             paused: self.paused,
+            hand_amplitude: self.hand_amplitude,
+            body_amplitude: self.body_amplitude,
         };
         if self.last_sent_settings == Some(settings) {
             return;
@@ -365,14 +331,6 @@ impl Desktop {
             self.keyboard_settings_open = true;
             ui.close();
         }
-        if ui
-            .button(self.text("演示双手动作", "Play hand animation"))
-            .clicked()
-        {
-            self.start_demo();
-            ui.ctx().request_repaint();
-            ui.close();
-        }
         let pause_label = if self.paused {
             self.text("继续动画", "Resume")
         } else {
@@ -380,7 +338,6 @@ impl Desktop {
         };
         if ui.button(pause_label).clicked() {
             self.paused = !self.paused;
-            self.demo = None;
             self.restart_input(ui.ctx());
             ui.close();
         }
@@ -424,12 +381,12 @@ impl eframe::App for Desktop {
         let settings_active =
             self.parent.is_some() && (self.desktop_settings_open || self.keyboard_settings_open);
         let events = self.global.poll();
-        if !settings_active && !self.paused && self.demo.is_none() {
+        if !settings_active && !self.paused {
             for event in events {
                 self.apply(event);
             }
         }
-        let local_input = !self.global_selected() && self.demo.is_none();
+        let local_input = !self.global_selected();
         ctx.input(|state| {
             if local_input && !state.focused && self.focused {
                 self.reset();
@@ -443,7 +400,6 @@ impl eframe::App for Desktop {
                 }
             }
         });
-        self.advance_demo(now, ctx);
         if self
             .animation
             .advance(now.saturating_duration_since(self.last_frame))
@@ -485,7 +441,13 @@ impl eframe::App for Desktop {
             if self.paused {
                 painter.set_opacity(0.62);
             }
-            artwork.draw(&painter, bounds, self.animation.positions());
+            artwork.draw(
+                &painter,
+                bounds,
+                self.animation.positions(),
+                self.hand_amplitude,
+                self.body_amplitude,
+            );
         } else {
             art::draw(ui.painter(), bounds, self.animation.positions());
         }
@@ -503,9 +465,7 @@ impl eframe::App for Desktop {
             }
         }
 
-        if self.artwork.is_none()
-            && (response.hovered() || self.focused || self.paused || self.demo.is_some())
-        {
+        if self.artwork.is_none() && (response.hovered() || self.focused || self.paused) {
             let close_rect = Rect::from_min_size(bounds.min + vec2(260.0, 12.0), vec2(25.0, 25.0));
             let close = ui.interact(close_rect, ui.id().with("close"), Sense::click());
             ui.painter().circle_filled(
@@ -530,11 +490,6 @@ impl eframe::App for Desktop {
                     self.text("已暂停 · 右键继续", "Paused · right-click to resume"),
                     Color32::from_rgb(190, 131, 112),
                 )
-            } else if self.demo.is_some() {
-                (
-                    self.text("双手动作演示中", "Playing hand animation"),
-                    Color32::from_rgb(63, 144, 146),
-                )
             } else if self.global_selected() {
                 (
                     self.text(
@@ -545,7 +500,7 @@ impl eframe::App for Desktop {
                 )
             } else if self.focused {
                 (
-                    self.text("按键试试 · 右键菜单", "Type here · right-click menu"),
+                    self.text("窗口输入 · 右键菜单", "Window input · right-click menu"),
                     Color32::from_rgb(63, 144, 146),
                 )
             } else {

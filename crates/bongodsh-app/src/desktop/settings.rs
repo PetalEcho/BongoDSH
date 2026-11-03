@@ -4,7 +4,7 @@ use eframe::egui::{
 
 use super::{
     Desktop,
-    controls::{checkbox_row, size_slider},
+    controls::{amplitude_slider, checkbox_row, size_slider},
 };
 use crate::sprites::Artwork;
 
@@ -196,7 +196,6 @@ impl Desktop {
                     self.artwork = Some(artwork);
                     self.character = character;
                     self.character_error = None;
-                    self.demo = None;
                     self.restart_input(ui.ctx());
                     self.docking.invalidate_geometry();
                     ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
@@ -214,7 +213,6 @@ impl Desktop {
         let mut paused = self.paused;
         if checkbox_row(ui, self.text("暂停动作", "Pause animation"), &mut paused) {
             self.paused = paused;
-            self.demo = None;
             self.restart_input(ui.ctx());
             ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
         }
@@ -247,30 +245,35 @@ impl Desktop {
             self.docking.invalidate_geometry();
             ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
         }
+        let hand_label = self.text("手部幅度", "Hand amplitude");
+        let body_label = self.text("身体幅度", "Body amplitude");
+        for (label, percent) in [
+            (hand_label, &mut self.hand_amplitude),
+            (body_label, &mut self.body_amplitude),
+        ] {
+            ui.push_id(label, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(label);
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new(format!("{percent}%")).color(palette.muted));
+                    });
+                });
+                if amplitude_slider(ui, percent).changed() {
+                    ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
+                }
+            });
+        }
         ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            let width = (ui.available_width() - ui.spacing().item_spacing.x) / 2.0;
-            if ui
-                .add_sized(
-                    [width, 30.0],
-                    egui::Button::new(self.text("试一下", "Try it")),
-                )
-                .clicked()
-            {
-                self.start_demo();
-                ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
-            }
-            if ui
-                .add_sized(
-                    [width, 30.0],
-                    egui::Button::new(self.text("恢复位置", "Reset position")),
-                )
-                .clicked()
-            {
-                self.docking.restore_initial();
-                ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
-            }
-        });
+        if ui
+            .add_sized(
+                [ui.available_width(), 30.0],
+                egui::Button::new(self.text("恢复位置", "Reset position")),
+            )
+            .clicked()
+        {
+            self.docking.restore_initial();
+            ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
+        }
         if ui
             .add_sized(
                 [ui.available_width(), 30.0],
