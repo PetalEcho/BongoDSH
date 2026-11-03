@@ -16,7 +16,7 @@ https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.
 | macOS Intel | [dsh-bongodsh-0.2.5-darwin-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-x64.tgz) |
 | Windows x64 | [dsh-bongodsh-0.2.5-win32-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-win32-x64.tgz) |
 
-0.2.5 各平台附件待构建、检查并上传后可用。也可以通过命令行添加链接：
+命令行也可直接添加链接：
 
 ```sh
 dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-arm64.tgz
@@ -24,7 +24,7 @@ dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/down
 
 其他平台替换为表中对应链接。`web` 是 profile 名称，按自己的 DSH 实例调整。安装或升级后重启对应 DSH 实例并刷新页面。
 
-各平台完整包包含页面插件、全部角色素材和桌面程序，无需安装 Rust。macOS 包未经过 Developer ID 签名和公证。Intel Mac 与 Windows 的构建和 CLI 检查不代表 GUI 实测。
+各平台完整包包含页面插件、全部角色素材和桌面程序，无需安装 Rust。macOS 包未经过 Developer ID 签名和公证。Intel Mac 和 Windows x64 界面尚未实机验证。
 
 ## 使用
 
@@ -69,7 +69,7 @@ npm run release
 
 产物在 `plugins/dsh-bongodsh/dist/`。命令校验版本，生成并核对客户端与 PNG，重建桌面程序，再按平台分别打包。它只生成本地文件，不自动上传或发布。
 
-macOS Apple Silicon 已验证页面显示、拖出、设置同步及全局键盘偏好恢复。Intel Mac 和 Windows x64 的构建与 CLI 检查结果待本次 CI 完成后补齐，两个平台均尚未 GUI 实机验收。详细记录见 [插件验证记录](docs/plugin-validation.md)、[桌面桥接](docs/desktop-bridge.md)。本地回归位于忽略的测试目录，新克隆仓库不含这些用例，CI 的 `cargo test` 不代表同等回归覆盖。
+macOS Apple Silicon 已验证页面显示、拖出、设置同步及全局键盘偏好恢复。详细记录见 [插件验证记录](docs/plugin-validation.md)、[桌面桥接](docs/desktop-bridge.md)。本地回归位于忽略的测试目录，新克隆仓库不含这些用例，CI 的 `cargo test` 不代表同等回归覆盖。
 
 ## 源码与素材
 

@@ -16,7 +16,7 @@ https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.
 | macOS Intel | [dsh-bongodsh-0.2.5-darwin-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-x64.tgz) |
 | Windows x64 | [dsh-bongodsh-0.2.5-win32-x64.tgz](https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-win32-x64.tgz) |
 
-0.2.5 各平台附件待构建、检查并上传后可用。命令行也可直接添加链接：
+命令行也可直接添加链接：
 
 ```sh
 dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/download/v0.2.5/dsh-bongodsh-0.2.5-darwin-arm64.tgz
@@ -24,7 +24,7 @@ dsh plugin --profile web add https://github.com/PetalEcho/BongoDSH/releases/down
 
 其他平台替换为表中对应链接；profile 按 DSH 实例调整。安装或升级后重启 DSH 并刷新页面。禁用或移除插件会清理页面角色和监听，用户设置保留。
 
-完整包包含页面、桌面程序和全部角色素材，无需安装 Rust。macOS 完整包未经过 Developer ID 签名和公证。Intel Mac 和 Windows x64 尚未 GUI 实测，构建与 CLI 检查结果待本次 CI 完成后补齐。页面模式不需要系统键盘权限。
+完整包包含页面、桌面程序和全部角色素材，无需安装 Rust。macOS 完整包未经过 Developer ID 签名和公证。Intel Mac 和 Windows x64 界面尚未实机验证。页面模式不需要系统键盘权限。
 
 ## 设置与操作
 

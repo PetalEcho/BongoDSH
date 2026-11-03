@@ -2,6 +2,14 @@
 
 记录实际执行的平台和检查，不代表所有平台均已实机验证。本地测试按项目约定不随源码提交。
 
+## 0.2.5
+
+2026-11-03，构建工具链统一为 Rust 1.99.1，插件与桌面程序版本统一为 0.2.5。Apple Silicon 通过格式检查、Clippy、27 项本地 Rust 回归、release 构建、命令行模拟和客户端产物一致性检查；功能与十二个 PNG 沿用已验证的 0.2.4，仅明确九处浮点字面量的类型以适配新版 Clippy。
+
+Windows x64 与 Intel Mac 在各自的 GitHub Actions runner 上完成格式检查、Clippy、可用目标测试、release 打包、版本校验和命令行模拟，见[构建记录](https://github.com/PetalEcho/BongoDSH/actions/runs/41591468550)。CI 不包含忽略的本地回归用例，两个平台的界面尚未实机验证。
+
+Release 仅提供三个平台的完整桌面包。DSH 通过对应附件的 HTTPS 链接安装，操作与链接见 [README](../README.md)。
+
 ## 0.2.4
 
 2026-11-03，页面和原生设置文案精简，三条滑块改为 4 px 轨道、约 14 px 圆柄与 24 px 操作区。59 项 Node 回归、27 项 Rust 回归、格式检查、macOS / Windows Clippy、release 构建和命令行模拟通过。
