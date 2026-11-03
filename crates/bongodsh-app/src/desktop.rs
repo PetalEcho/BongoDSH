@@ -9,8 +9,11 @@ use bongodsh_core::{InputEvent, KeyId, TypingState, animation::HandAnimation};
 
 use crate::{
     art,
+    detached::{self, Launch},
+    docking::Docking,
     global_input::{GlobalInput, Status},
     input,
+    sprites::Artwork,
 };
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
@@ -20,25 +23,30 @@ enum InputSource {
     Global,
 }
 
-pub(crate) fn run() -> eframe::Result {
+pub(crate) fn run(launch: Option<Launch>) -> eframe::Result {
+    let size = launch.map_or([300.0, 270.0], |launch| {
+        [launch.size, launch.size * 252.0 / 300.0]
+    });
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("BongoDSH")
-            .with_inner_size([300.0, 270.0])
+            .with_inner_size(size)
             .with_resizable(false)
             .with_decorations(false)
             .with_transparent(true)
             .with_has_shadow(false)
             .with_always_on_top()
+            .with_active(launch.is_none())
+            .with_visible(launch.is_none())
             .with_icon(IconData::default()),
         renderer: eframe::Renderer::Glow,
-        centered: true,
+        centered: launch.is_none(),
         ..Default::default()
     };
     eframe::run_native(
         "BongoDSH",
         options,
-        Box::new(|creation| Ok(Box::new(Desktop::new(&creation.egui_ctx)))),
+        Box::new(move |creation| Ok(Box::new(Desktop::new(creation, launch)?))),
     )
 }
 
@@ -48,6 +56,10 @@ struct Demo {
 }
 
 struct Desktop {
+    artwork: Option<Artwork>,
+    docking: Docking,
+    parent: Option<std::sync::mpsc::Receiver<()>>,
+    ready: bool,
     typing: TypingState,
     animation: HandAnimation,
     last_frame: Instant,
@@ -59,11 +71,27 @@ struct Desktop {
     source: InputSource,
     global: GlobalInput,
     keyboard_settings_open: bool,
+    desktop_settings_open: bool,
     settings_error: Option<String>,
 }
 
 impl Desktop {
-    fn new(ctx: &egui::Context) -> Self {
+    fn new(
+        creation: &eframe::CreationContext<'_>,
+        launch: Option<Launch>,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let ctx = &creation.egui_ctx;
+        let artwork = launch
+            .map(|launch| Artwork::load(ctx, launch.character))
+            .transpose()
+            .map_err(std::io::Error::other)?;
+        let docking = Docking::new(creation, launch.map(|launch| launch.grab));
+        if launch.is_some() && !docking.available() {
+            return Err(std::io::Error::other("当前平台无法接续桌面拖动。").into());
+        }
+        let parent = launch
+            .map(|_| detached::watch_parent(ctx.clone()))
+            .transpose()?;
         ctx.set_visuals(egui::Visuals::light());
         ctx.global_style_mut(|style| {
             style.visuals.window_fill = Color32::from_rgb(243, 250, 251);
@@ -71,7 +99,11 @@ impl Desktop {
             style.visuals.selection.bg_fill = Color32::from_rgb(162, 215, 221);
             style.spacing.button_padding = vec2(10.0, 7.0);
         });
-        Self {
+        Ok(Self {
+            artwork,
+            docking,
+            parent,
+            ready: false,
             typing: TypingState::default(),
             animation: HandAnimation::default(),
             last_frame: Instant::now(),
@@ -83,8 +115,9 @@ impl Desktop {
             source: InputSource::Window,
             global: GlobalInput::default(),
             keyboard_settings_open: false,
+            desktop_settings_open: false,
             settings_error: None,
-        }
+        })
     }
 
     fn text(&self, chinese: &'static str, english: &'static str) -> &'static str {
@@ -265,6 +298,28 @@ impl Desktop {
         );
     }
 
+    fn desktop_window(&mut self, ctx: &egui::Context) {
+        if !self.desktop_settings_open {
+            return;
+        }
+        ctx.show_viewport_immediate(
+            egui::ViewportId::from_hash_of("desktop-settings"),
+            egui::ViewportBuilder::default()
+                .with_title(self.text("BongoDSH · 桌面角色", "BongoDSH · Desktop companion"))
+                .with_inner_size([360.0, 450.0]),
+            |ui, _class| {
+                if ui.ctx().input(|input| input.viewport().close_requested()) {
+                    self.desktop_settings_open = false;
+                }
+                egui::Frame::central_panel(ui.style())
+                    .inner_margin(16.0)
+                    .show(ui, |ui| {
+                        egui::ScrollArea::vertical().show(ui, |ui| self.menu(ui));
+                    });
+            },
+        );
+    }
+
     fn menu(&mut self, ui: &mut egui::Ui) {
         ui.set_min_width(185.0);
         ui.label(egui::RichText::new("BongoDSH").strong());
@@ -307,22 +362,40 @@ impl Desktop {
         }
         let top_label = self.text("保持置顶", "Always on top");
         if ui.checkbox(&mut self.always_on_top, top_label).changed() {
-            ui.ctx()
-                .send_viewport_cmd(ViewportCommand::WindowLevel(if self.always_on_top {
+            ui.ctx().send_viewport_cmd_to(
+                egui::ViewportId::ROOT,
+                ViewportCommand::WindowLevel(if self.always_on_top {
                     WindowLevel::AlwaysOnTop
                 } else {
                     WindowLevel::Normal
-                }));
+                }),
+            );
         }
+        self.docking.menu(ui, self.chinese_font);
         ui.separator();
-        if ui.button(self.text("退出挂件", "Quit BongoDSH")).clicked() {
-            ui.ctx().send_viewport_cmd(ViewportCommand::Close);
+        let close_label = if self.parent.is_some() {
+            self.text("返回 DSH", "Return to DSH")
+        } else {
+            self.text("退出挂件", "Quit BongoDSH")
+        };
+        if ui.button(close_label).clicked() {
+            ui.ctx()
+                .send_viewport_cmd_to(egui::ViewportId::ROOT, ViewportCommand::Close);
         }
     }
 }
 
 impl eframe::App for Desktop {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if let Some(parent) = &self.parent
+            && matches!(
+                parent.try_recv(),
+                Ok(()) | Err(std::sync::mpsc::TryRecvError::Disconnected)
+            )
+        {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+            return;
+        }
         let now = Instant::now();
         let events = self.global.poll();
         if !self.paused && self.demo.is_none() {
@@ -356,20 +429,50 @@ impl eframe::App for Desktop {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let bounds = ui.max_rect();
+        let hit = self.artwork.as_ref().map_or_else(
+            || art::hit_bounds(bounds),
+            |artwork| artwork.content_bounds(bounds),
+        );
+        self.docking.update(ui.ctx(), hit);
         let response = ui.interact(
-            art::hit_bounds(bounds),
+            hit,
             ui.id().with("character"),
             // Typing Enter/Space must animate hands, not activate a focused button.
             Sense::CLICK | Sense::DRAG,
         );
         if response.drag_started_by(egui::PointerButton::Primary) {
+            self.docking.begin_drag();
             ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
         }
-        response.context_menu(|ui| self.menu(ui));
+        if self.artwork.is_some() {
+            if response.secondary_clicked() {
+                self.desktop_settings_open = true;
+            }
+        } else {
+            response.context_menu(|ui| self.menu(ui));
+        }
         let response = response.on_hover_cursor(egui::CursorIcon::Grab);
-        art::draw(ui.painter(), bounds, self.animation.positions());
+        if let Some(artwork) = &self.artwork {
+            artwork.draw(ui.painter(), bounds, self.animation.positions());
+        } else {
+            art::draw(ui.painter(), bounds, self.animation.positions());
+        }
+        if !self.ready && self.parent.is_some() {
+            use std::io::Write;
+            self.ready = true;
+            ui.ctx().send_viewport_cmd(ViewportCommand::Visible(true));
+            let mut output = std::io::stdout().lock();
+            if writeln!(output, "{{\"event\":\"ready\"}}")
+                .and_then(|_| output.flush())
+                .is_err()
+            {
+                ui.ctx().send_viewport_cmd(ViewportCommand::Close);
+            }
+        }
 
-        if response.hovered() || self.focused || self.paused || self.demo.is_some() {
+        if self.artwork.is_none()
+            && (response.hovered() || self.focused || self.paused || self.demo.is_some())
+        {
             let close_rect = Rect::from_min_size(bounds.min + vec2(260.0, 12.0), vec2(25.0, 25.0));
             let close = ui.interact(close_rect, ui.id().with("close"), Sense::click());
             ui.painter().circle_filled(
@@ -429,6 +532,7 @@ impl eframe::App for Desktop {
             );
         }
         self.keyboard_window(ui.ctx());
+        self.desktop_window(ui.ctx());
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

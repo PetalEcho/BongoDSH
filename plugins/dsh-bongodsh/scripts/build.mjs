@@ -5,18 +5,21 @@ import { createModel } from '../src/model.js';
 import { createArtwork } from '../src/art.js';
 import { mountWidget } from '../src/widget.js';
 import { styles } from '../src/styles.js';
+import { pngBounds } from './png.mjs';
+import { createDesktopBridge } from '../src/desktop-bridge.js';
 
 const target = new URL('../client.js', import.meta.url);
 const images = {};
 const runtimeCharacters = [];
 for (const character of characters) {
-  const runtime = { id: character.id, label: character.label };
+  const runtime = { id: character.id, label: character.label, handLayout: character.handLayout, bounds: {} };
   for (const layer of ['body', 'leftHand', 'rightHand']) {
     if (!character[layer]) continue;
     const bytes = await readFile(new URL(`../../../assets/${character[layer]}`, import.meta.url));
     const hash = createHash('sha256').update(bytes).digest('hex');
     images[hash] = `data:image/png;base64,${bytes.toString('base64')}`;
     runtime[layer] = hash;
+    runtime.bounds[layer] = pngBounds(bytes);
   }
   runtimeCharacters.push(runtime);
 }
@@ -38,12 +41,14 @@ window.__ModuleLoader__.load({
     const model = (${sourceOf(createModel)})(characters.map(character => character.id));
     const createArtwork = ${sourceOf(createArtwork)};
     const mountWidget = ${sourceOf(mountWidget)};
+    const createDesktopBridge = ${sourceOf(createDesktopBridge)};
     const styles = ${JSON.stringify(styles)};
     return {
       name: 'dsh-bongodsh',
       apply(ctx) {
         ctx.effect(() => {
-          const widget = mountWidget(model, createArtwork, styles, characters);
+          const bridge = createDesktopBridge(ctx);
+          const widget = mountWidget(model, createArtwork, styles, characters, window, bridge);
           return () => widget.dispose();
         });
       },

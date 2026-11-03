@@ -95,8 +95,9 @@ export function createModel(characterIds = ['fish-maid']) {
   }
 
   function placement(settings, viewport, composer = null) {
-    const margin = 8;
-    const width = Math.min(settings.size, Math.max(40, viewport.width - margin * 2));
+    const margin = Math.min(8, viewport.width / 4, viewport.height / 4);
+    const width = Math.min(settings.size, Math.max(1, viewport.width - margin * 2),
+      Math.max(1, (viewport.height - margin * 2) / 0.84));
     const height = width * 0.84;
     const minX = viewport.left + margin;
     const minY = viewport.top + margin;
@@ -106,10 +107,23 @@ export function createModel(characterIds = ['fish-maid']) {
     let y = minY + settings.y * (maxY - minY);
     if (settings.docked && composer) {
       x = composer.right - width - 8;
-      y = composer.top - height;
+      // The visible body ends at y=248 in the 300×252 artwork, not at the SVG box edge.
+      y = composer.top - width * 248 / 300 - 1;
     }
     return { x: clamp(x, minX, maxX), y: clamp(y, minY, maxY), width, height, minX, minY, maxX, maxY };
   }
 
-  return { TypingState, Animation, settingsFrom, placement, clamp, typingCodes };
+  function leavesViewport(box, viewport, pointer = null, movement = null) {
+    const overshoot = 16;
+    return box.x < viewport.left - overshoot || box.y < viewport.top - overshoot
+      || box.x + box.width > viewport.left + viewport.width + overshoot
+      || box.y + box.height > viewport.top + viewport.height + overshoot
+      || !!(pointer && movement && (
+        (movement.x < 0 && pointer.x <= viewport.left + 8)
+        || (movement.y < 0 && pointer.y <= viewport.top + 8)
+        || (movement.x > 0 && pointer.x >= viewport.left + viewport.width - 8)
+        || (movement.y > 0 && pointer.y >= viewport.top + viewport.height - 8)));
+  }
+
+  return { TypingState, Animation, settingsFrom, placement, leavesViewport, clamp, typingCodes };
 }

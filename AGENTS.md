@@ -3,7 +3,7 @@
 ## 产品与范围
 
 - BongoDSH 是使用 Rust 实现的独立桌面打字挂件，目标平台为 macOS 和 Windows。
-- DSH 指参考仓库所使用的 DeepSeek Harness。`plugins/dsh-bongodsh/` 提供直接在 DSH 页面显示角色的独立插件；与 Rust 桌面进程传递布局和任务事件的桥接仍待实现。
+- DSH 指参考仓库所使用的 DeepSeek Harness。`plugins/dsh-bongodsh/` 提供页面角色和拖出桌面的宿主桥接；原生输入框定位与任务事件尚未接入。协议与验证边界见 `docs/desktop-bridge.md`。
 - 项目基调、分期和平台边界见 `docs/project-baseline.md`。当前已有 egui/eframe 桌面原型与 macOS / Windows 全局键盘适配，默认窗口输入，用户主动开启全局模式。权限与验证边界见 `docs/global-keyboard.md`；页面插件的安装和兼容边界见 `plugins/dsh-bongodsh/README.md`。
 - 角色小巧、低干扰，主要操作通过右键或托盘进入。设置面板优先展示预览和常用设置，不使用超大标题或口号式 Hero。
 - 用户明确要求角色不配键盘图形。身体与双手保持独立图层，双手叠放在身体前侧，不在身体下方单独留一排空间。
@@ -14,7 +14,7 @@
 - `bongodsh-core` 维护平台无关状态与规则，不访问窗口、文件系统、网络或系统键盘。
 - `bongodsh-app` 负责组装应用。后续 macOS、Windows API 放在独立平台模块或 crate，按目标平台编译。
 - 桌面使用 eframe 0.34.3，启用 `glow` 和 `default_fonts`；核心仍只依赖标准库。新增依赖前说明用途、平台支持和引入成本，只启用需要的 features。
-- 核心 crate 以 `forbid(unsafe_code)` 禁止 `unsafe`。工作区默认 `deny(unsafe_code)`，仅应用层 `global_input/macos.rs` 与 `global_input/windows.rs` 放行原生 FFI，并启用 `unsafe_op_in_unsafe_fn` 和 `clippy::undocumented_unsafe_blocks` 检查，为每处 `unsafe` 说明安全前提。
+- 核心 crate 以 `forbid(unsafe_code)` 禁止 `unsafe`。工作区默认 `deny(unsafe_code)`，仅应用层 `global_input/{macos,windows}.rs` 和 `platform/{macos,windows}.rs` 放行原生 FFI，并启用 `unsafe_op_in_unsafe_fn` 和 `clippy::undocumented_unsafe_blocks` 检查，为每处 `unsafe` 说明安全前提。
 - 可恢复错误返回 `Result`，不用 `unwrap()`、`expect()` 或 panic 处理用户输入和权限失败。
 - 事件循环按需唤醒；不要在输入回调中执行磁盘、网络或音频解码任务。
 
@@ -29,10 +29,10 @@
 
 ## DSH 页面插件
 
-- 插件使用无生产依赖的 JavaScript，宿主入口仅供 DSH 发现客户端，不启动网络监听或桌面进程。
+- 插件使用无生产依赖的 JavaScript。拖出经 DSH 认证连接启动固定本地二进制，只传角色、尺寸和归一化抓取位置，不启动额外网络监听或接收任意路径与命令。宿主管道关闭须回收子进程。
 - 角色原图和线稿保存在根 `assets/`，来源见 `docs/dsh-character-assets.md`；插件通过 `src/characters.js` 登记彩稿。构建时将 PNG 原样编码并去重，内嵌到 `client.js`，兼容没有资源接口的 DSH 0.2.1-rc.5，不修改原图像素。没有独立手部素材的角色仅做身体动作。
 - 修改 `plugins/dsh-bongodsh/src/` 后运行该目录的 `npm run build` 与 `npm run check`，保留生成的 `client.js`。安装包使用 `files` 白名单，预览和本地测试不打包。
-- 页面坐标仅使用 CSS 像素和显式输入框标记；不宣称支持原生屏幕吸附。插件卸载时清理 DOM、事件、定时器、动画帧和观察器。
+- 页面坐标仅使用 CSS 像素和显式输入框标记；原生鼠标接续拖动，跨程序吸附只读取窗口几何，不读取其他程序输入框。插件卸载时清理 DOM、事件、定时器、动画帧、观察器和宿主子进程。
 - 插件本地测试放在忽略的 `plugins/dsh-bongodsh/tests/`，同样不得暂存、提交或推送。
 
 ## 验证与 Git

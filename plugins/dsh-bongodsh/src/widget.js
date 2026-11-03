@@ -1,5 +1,5 @@
 // Dependencies are explicit so the build can embed this function without a bundler.
-export function mountWidget(model, createArtwork, styles, characters, win = window) {
+export function mountWidget(model, createArtwork, styles, characters, win = window, desktopBridge = null) {
   const document = win.document;
   const instanceKey = Symbol.for('bongodsh.widget');
   win[instanceKey]?.dispose();
@@ -24,7 +24,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   pet.setAttribute('aria-label', 'BongoDSH 角色，点击设置或拖动位置');
   pet.setAttribute('aria-expanded', 'false');
   pet.setAttribute('aria-controls', 'bongo-settings');
-  pet.title = '拖动移动 · 点击或右键设置';
+  pet.title = '拖出窗口移到桌面 · 点击或右键设置';
   const artwork = createArtwork(document, characters);
   pet.append(artwork.svg);
   const hint = document.createElement('span');
@@ -46,6 +46,8 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     <label class="row" for="bongo-size">角色大小<output for="bongo-size"></output></label>
     <input id="bongo-size" name="size" type="range" min="100" max="220" step="10">
     <div class="actions"><button type="button" class="action demo">试一下</button><button type="button" class="action reset">恢复位置</button></div>
+    <button type="button" class="action desktop">移到桌面</button>
+    <p class="note desktop-status" role="status">拖出窗口可移到桌面，并吸附其他程序窗口。</p>
     <p class="note anchor-status"></p>
     <p class="note">仅响应当前页面的物理按键，不保存输入内容。</p>
     <p class="note notice" role="status" hidden>设置暂时无法保存，当前页面仍可使用。</p>`;
@@ -65,6 +67,8 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   const closeButton = panel.querySelector('.close');
   const notice = panel.querySelector('.notice');
   const anchorStatus = panel.querySelector('.anchor-status');
+  const desktopButton = panel.querySelector('.desktop');
+  const desktopStatus = panel.querySelector('.desktop-status');
   const motionPreference = win.matchMedia('(prefers-reduced-motion: reduce)');
   let disposed = false;
   let frame = 0;
@@ -78,6 +82,68 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   let drag = null;
   let suppressClick = false;
   let restoreFocus = null;
+  let detached = false;
+  let detachPending = false;
+  let desktopTimer = 0;
+  let desktopVersion = 0;
+  let checkingDesktop = false;
+
+  function setDetached(value) {
+    detached = value;
+    host.hidden = value;
+    if (value) { resetInput(); closePanel(); }
+    else { syncSettings(); schedulePlace(); }
+  }
+
+  async function checkDesktop() {
+    win.clearTimeout(desktopTimer);
+    desktopTimer = 0;
+    if (disposed || !desktopBridge || document.hidden || checkingDesktop) return;
+    checkingDesktop = true;
+    const version = desktopVersion;
+    try {
+      const status = await desktopBridge.status();
+      if (disposed) return;
+      if (!detachPending && version === desktopVersion) setDetached(status.active === true);
+      desktopStatus.textContent = status.available
+        ? '拖出窗口后，靠近其他程序的窗口边缘松手即可吸附。'
+        : '尚未安装桌面组件，请按插件说明完成桌面设置。';
+    } catch {
+      if (!disposed) {
+        desktopStatus.textContent = '拖出功能需要本机 DSH 和已构建的桌面挂件。';
+      }
+    } finally { checkingDesktop = false; }
+    if (!disposed && detached && !document.hidden) desktopTimer = win.setTimeout(checkDesktop, 1000);
+  }
+
+  async function detachToDesktop(grabX = 0.5, grabY = 0.5) {
+    if (detachPending || detached || disposed) return;
+    if (!desktopBridge) {
+      desktopStatus.textContent = '请在本机 DSH 中使用拖出功能。';
+      openPanel();
+      return;
+    }
+    detachPending = true;
+    desktopVersion++;
+    desktopButton.disabled = true;
+    desktopStatus.textContent = '正在移到桌面…';
+    resetInput();
+    try {
+      await desktopBridge.detach(settings.character, settings.size, grabX, grabY);
+      if (disposed) return;
+      endDrag(true);
+      setDetached(true);
+    } catch (error) {
+      if (disposed) return;
+      endDrag(true);
+      desktopStatus.textContent = error.message;
+      if (!document.hidden) openPanel();
+    } finally {
+      detachPending = false;
+      desktopButton.disabled = false;
+      if (!disposed && detached) desktopTimer = win.setTimeout(checkDesktop, 1000);
+    }
+  }
 
   function on(target, name, listener, options = {}) {
     target.addEventListener(name, listener, { ...options, signal: events.signal });
@@ -154,7 +220,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   }
 
   function place() {
-    if (disposed || drag) return;
+    if (disposed || drag || detached) return;
     const rect = locateComposer();
     box = model.placement(settings, viewport(), rect);
     host.style.width = `${box.width}px`;
@@ -217,6 +283,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     pet.setAttribute('aria-expanded', 'true');
     positionPanel();
     closeButton.focus({ preventScroll: true });
+    void checkDesktop();
   }
 
   function ownEvent(event) { return event.composedPath().includes(host); }
@@ -246,7 +313,11 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   on(pet, 'pointerdown', event => {
     if (event.button !== 0 || !event.isPrimary || !box) return;
     suppressClick = false;
-    drag = { id: event.pointerId, startX: event.clientX, startY: event.clientY, x: box.x, y: box.y, moved: false };
+    drag = {
+      id: event.pointerId, startX: event.clientX, startY: event.clientY, x: box.x, y: box.y, moved: false,
+      grabX: model.clamp((event.clientX - box.x) / box.width, 0, 1),
+      grabY: model.clamp((event.clientY - box.y) / box.height, 0, 1), leaving: false,
+    };
     pet.setPointerCapture(event.pointerId);
     // Dragging the companion must not take keyboard focus from the composer.
     event.preventDefault();
@@ -261,8 +332,17 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     box.x = model.clamp(drag.x + dx, box.minX, box.maxX);
     box.y = model.clamp(drag.y + dy, box.minY, box.maxY);
     host.style.transform = `translate(${box.x}px, ${box.y}px)`;
+    const view = viewport();
+    // Electron may stop delivering moves after the pointer leaves the native window.
+    const outside = model.leavesViewport({ ...box, x: drag.x + dx, y: drag.y + dy }, view,
+      { x: event.clientX, y: event.clientY }, { x: dx, y: dy });
+    if (!drag.leaving && outside) {
+      drag.leaving = true;
+      void detachToDesktop(drag.grabX, drag.grabY);
+    }
   });
   on(pet, 'pointerup', event => { if (event.pointerId === drag?.id) endDrag(); });
+  // The native window can cancel page pointer capture while taking over the drag.
   on(pet, 'pointercancel', () => endDrag(true));
   on(pet, 'lostpointercapture', () => endDrag(true));
   on(pet, 'click', event => {
@@ -293,6 +373,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     settings.docked = true; settings.x = 1; settings.y = 1;
     save(); syncSettings(); place();
   });
+  on(desktopButton, 'click', () => { void detachToDesktop(); });
   on(panel.querySelector('.demo'), 'click', () => {
     resetInput();
     apply(state.press('KeyA')); apply(state.release('KeyA'));
@@ -302,7 +383,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     }, 120);
   });
   on(win, 'keydown', event => {
-    if (!event.isTrusted || document.hidden || settings.paused || !panel.hidden || ownEvent(event) || passwordEvent(event)) return;
+    if (!event.isTrusted || document.hidden || detached || detachPending || settings.paused || !panel.hidden || ownEvent(event) || passwordEvent(event)) return;
     if (event.metaKey || ((event.ctrlKey || event.altKey) && !event.getModifierState('AltGraph'))) {
       resetInput();
       return;
@@ -314,13 +395,16 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
   on(win, 'blur', () => { resetInput(); endDrag(true); closePanel(); });
   on(win, 'pagehide', () => { resetInput(); endDrag(true); });
   on(win, 'pageshow', schedulePlace);
+  on(win, 'focus', () => { void checkDesktop(); });
   on(document, 'visibilitychange', () => {
     resetInput(); endDrag(true);
     if (document.hidden) {
       if (layoutFrame) win.cancelAnimationFrame(layoutFrame);
       layoutFrame = 0;
       closePanel();
-    } else schedulePlace();
+      win.clearTimeout(desktopTimer);
+      desktopTimer = 0;
+    } else { schedulePlace(); void checkDesktop(); }
   });
   on(motionPreference, 'change', resetInput);
   on(win, 'resize', () => { endDrag(true); schedulePlace(); });
@@ -354,6 +438,7 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
       attributeFilter: ['hidden', 'inert', 'aria-hidden', 'class', 'style', 'data-composer-card'],
     });
     syncSettings(); place(); render();
+    void checkDesktop();
   }
 
   function dispose() {
@@ -365,6 +450,8 @@ export function mountWidget(model, createArtwork, styles, characters, win = wind
     if (layoutFrame) win.cancelAnimationFrame(layoutFrame);
     resizeObserver?.disconnect();
     mutationObserver?.disconnect();
+    win.clearTimeout(desktopTimer);
+    desktopBridge?.dispose();
     if (document.activeElement === host && restoreFocus?.isConnected) restoreFocus.focus({ preventScroll: true });
     host.remove();
     if (win[instanceKey] === controller) delete win[instanceKey];

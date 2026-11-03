@@ -14,13 +14,20 @@ path = "src/main.rs"
 [dependencies]
 bongodsh-core.workspace = true
 eframe.workspace = true
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+raw-window-handle = "0.6.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9.4"
+core-graphics = "0.23.2"
+objc2 = "0.6.5"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSEvent", "NSScreen", "NSView", "NSWindow"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSGeometry", "NSProcessInfo"] }
 objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFMachPort", "CFRunLoop", "CFDate"] }
 objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGEvent", "CGEventTypes", "CGEventSource", "CGRemoteOperation"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61.2", default-features = false, features = ["Win32_Foundation", "Win32_System_LibraryLoader", "Win32_System_RemoteDesktop", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
+windows-sys = { version = "0.61.2", default-features = false, features = ["Win32_Foundation", "Win32_System_LibraryLoader", "Win32_System_RemoteDesktop", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_UI_HiDpi"] }
 
 [lints]
 workspace = true

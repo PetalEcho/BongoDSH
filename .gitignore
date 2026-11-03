@@ -11,3 +11,4 @@
 /crates/bongodsh-app/tests/
 /plugins/dsh-bongodsh/tests/
 /plugins/dsh-bongodsh/dist/
+/plugins/dsh-bongodsh/native/

@@ -2,7 +2,7 @@ export const styles = `
   :host { all: initial; position: fixed; left: 0; top: 0; z-index: 40; pointer-events: none;
     font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; color: #2a4352; }
   *, *::before, *::after { box-sizing: border-box; }
-  [hidden] { display: none !important; }
+  [hidden], :host([hidden]) { display: none !important; }
   button, input, select { font: inherit; }
   button { cursor: pointer; color: inherit; }
   button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #27768b; outline-offset: 3px; }
@@ -31,6 +31,8 @@ export const styles = `
   output { font-variant-numeric: tabular-nums; color: #536b77; }
   .actions { display: flex; gap: 8px; margin: 10px 0; }
   .action { flex: 1; background: #e3f1f4; border: 1px solid #bad5dc; border-radius: 7px; padding: 6px 8px; }
+  .desktop { width: 100%; }
+  button:disabled { cursor: wait; opacity: .6; }
   .note { margin: 10px 0 0; font-size: 11px; color: #536b77; }
   .notice { color: #9b492b; }
   @media (prefers-color-scheme: dark) {
